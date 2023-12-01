@@ -25,15 +25,15 @@ trait Fold1 {
 
     fn new() -> Self;
     fn init(self: &Self, x: Self::A) -> Self::M;
-    fn step(self: &Self, x: Self::A, acc: Self::M) -> Self::M;
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M);
     fn output(self: &Self, acc: Self::M) -> Self::B;
 }
 
 fn run_fold1<I, O>(fold: impl Fold1<A = I, B = O>, mut xs: impl Iterator<Item = I>) -> Option<O> {
     if let Some(first) = xs.next() {
-        let acc = fold.init(first);
-        let acc_ = xs.fold(acc, |b, i| fold.step(i, b));
-        return Some(fold.output(acc_));
+        let mut acc = fold.init(first);
+        xs.for_each(|i| fold.step(i, &mut acc));
+        return Some(fold.output(acc));
     } else {
         return None;
     }
@@ -80,12 +80,15 @@ impl<A: std::cmp::Ord> Fold1 for Max<A> {
         Max { ghost: PhantomData }
     }
 
-    fn init(self: &Self, x: Self::A) -> Self::M {
+    fn init(self: &Self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: Self::A, acc: Self::M) -> Self::M {
-        std::cmp::max(x, acc)
+    fn step(self: &Self, x: A, acc: &mut A) -> () {
+        if x < *acc {
+        } else {
+            *acc = x;
+        }
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
@@ -108,12 +111,15 @@ impl<A: std::cmp::Ord> Fold1 for Min<A> {
         Min { ghost: PhantomData }
     }
 
-    fn init(self: &Self, x: Self::A) -> Self::M {
+    fn init(self: &Self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: Self::A, acc: Self::M) -> Self::M {
-        std::cmp::min(x, acc)
+    fn step(self: &Self, x: A, acc: &mut A) {
+        if x > *acc {
+        } else {
+            *acc = x;
+        }
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
@@ -134,13 +140,11 @@ impl<A> Fold1 for First<A> {
         First { ghost: PhantomData }
     }
 
-    fn init(self: &Self, x: Self::A) -> Self::M {
+    fn init(self: &Self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: Self::A, acc: Self::M) -> Self::M {
-        acc
-    }
+    fn step(self: &Self, _x: A, _acc: &mut A) {}
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
         acc
@@ -160,12 +164,12 @@ impl<A> Fold1 for Last<A> {
         Last { ghost: PhantomData }
     }
 
-    fn init(self: &Self, x: Self::A) -> Self::M {
+    fn init(self: &Self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: Self::A, acc: Self::M) -> Self::M {
-        x
+    fn step(self: &Self, x: A, mut acc: &mut A) {
+        *acc = x;
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
@@ -203,6 +207,37 @@ impl<I, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
 
     fn output(self: &Self, (acc1, acc2): Self::M) -> Self::B {
         (self.f1.output(acc1), self.f2.output(acc2))
+    }
+}
+
+impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
+    type A = I;
+
+    type B = (F1::B, F2::B);
+
+    type M = (F1::M, F2::M);
+
+    fn new() -> Self {
+        Par2 {
+            f1: F1::new(),
+            f2: F2::new(),
+        }
+    }
+
+    fn init(self: &Self, x: Self::A) -> Self::M {
+        let i1 = self.f1.init(x);
+        let i2 = self.f2.init(x);
+
+        (i1, i2)
+    }
+
+    fn step(self: &Self, x: Self::A, (acc1, acc2): &mut Self::M) {
+        self.f1.step(x, acc1);
+        self.f2.step(x, acc2);
+    }
+
+    fn output(self: &Self, (a1, a2): Self::M) -> Self::B {
+        (self.f1.output(a1), self.f2.output(a2))
     }
 }
 
