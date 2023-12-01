@@ -206,13 +206,10 @@ impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
 
 struct FilteredFold<F: Fold> {
     inner: F,
-    pred: dyn Fn(F::A) -> bool,
+    pred: dyn Fn(&F::A) -> bool,
 }
 
-impl<F: Fold> Fold for FilteredFold<F>
-where
-    F::A: Copy,
-{
+impl<F: Fold> Fold for FilteredFold<F> {
     type A = F::A;
     type B = F::B;
     type M = F::M;
@@ -222,7 +219,7 @@ where
     }
 
     fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
-        if (self.pred)(x) {
+        if (self.pred)(&x) {
             self.inner.step(x, acc)
         }
     }
