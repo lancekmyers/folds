@@ -8,13 +8,13 @@ trait Fold {
     fn new() -> Self;
 
     fn empty(self: &Self) -> Self::M;
-    fn step(self: &Self, x: &Self::A, acc: &mut Self::M);
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M);
     fn output(self: &Self, acc: Self::M) -> Self::B;
 }
 
 fn run_fold<I, O>(fold: impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
     let mut acc = fold.empty();
-    xs.for_each(|i| fold.step(&i, &mut acc));
+    xs.for_each(|i| fold.step(i, &mut acc));
     return fold.output(acc);
 }
 
@@ -43,7 +43,7 @@ struct Sum<A> {
     ghost: PhantomData<A>,
 }
 
-impl<A: std::ops::AddAssign + From<u32> + Copy> Fold for Sum<A> {
+impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
     type A = A;
     type B = A;
     type M = A;
@@ -56,8 +56,8 @@ impl<A: std::ops::AddAssign + From<u32> + Copy> Fold for Sum<A> {
         From::from(0)
     }
 
-    fn step(self: &Self, x: &A, acc: &mut A) {
-        *acc += *x
+    fn step(self: &Self, x: A, acc: &mut A) {
+        *acc += x
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
@@ -182,7 +182,7 @@ struct Par2<F1, F2> {
     f2: F2,
 }
 
-impl<I, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
+impl<I: Copy, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
     type A = I;
 
     type B = (F1::B, F2::B);
@@ -200,7 +200,7 @@ impl<I, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
         (self.f1.empty(), self.f2.empty())
     }
 
-    fn step(self: &Self, x: &Self::A, (acc1, acc2): &mut (<F1 as Fold>::M, <F2 as Fold>::M)) {
+    fn step(self: &Self, x: Self::A, (acc1, acc2): &mut (<F1 as Fold>::M, <F2 as Fold>::M)) {
         self.f1.step(x, acc1);
         self.f2.step(x, acc2);
     }
