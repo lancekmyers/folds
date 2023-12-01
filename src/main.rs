@@ -43,7 +43,7 @@ struct Sum<A> {
     ghost: PhantomData<A>,
 }
 
-impl<A: std::ops::AddAssign + From<u32> + Clone> Fold for Sum<A> {
+impl<A: std::ops::AddAssign + From<u32> + Copy> Fold for Sum<A> {
     type A = A;
     type B = A;
     type M = A;
@@ -57,7 +57,7 @@ impl<A: std::ops::AddAssign + From<u32> + Clone> Fold for Sum<A> {
     }
 
     fn step(self: &Self, x: &A, acc: &mut A) {
-        *acc += x.clone()
+        *acc += *x
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
