@@ -8,14 +8,14 @@ trait Fold {
     fn new() -> Self;
 
     fn empty(self: &Self) -> Self::M;
-    fn step(self: &Self, x: Self::A, acc: Self::M) -> Self::M;
+    fn step(self: &Self, x: &Self::A, acc: &mut Self::M);
     fn output(self: &Self, acc: Self::M) -> Self::B;
 }
 
 fn run_fold<I, O>(fold: impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
-    let acc = fold.empty();
-    let acc_ = xs.fold(acc, |b, i| fold.step(i, b));
-    return fold.output(acc_);
+    let mut acc = fold.empty();
+    xs.for_each(|i| fold.step(&i, &mut acc));
+    return fold.output(acc);
 }
 
 trait Fold1 {
@@ -43,7 +43,7 @@ struct Sum<A> {
     ghost: PhantomData<A>,
 }
 
-impl<A: std::ops::Add<Output = A> + From<u32>> Fold for Sum<A> {
+impl<A: std::ops::AddAssign + From<u32> + Clone> Fold for Sum<A> {
     type A = A;
     type B = A;
     type M = A;
@@ -56,8 +56,8 @@ impl<A: std::ops::Add<Output = A> + From<u32>> Fold for Sum<A> {
         From::from(0)
     }
 
-    fn step(self: &Self, x: A, acc: A) -> A {
-        acc + x
+    fn step(self: &Self, x: &A, acc: &mut A) {
+        *acc += x.clone()
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
@@ -173,11 +173,44 @@ impl<A> Fold1 for Last<A> {
     }
 }
 
+struct Par2<F1, F2> {
+    f1: F1,
+    f2: F2,
+}
+
+impl<I, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
+    type A = I;
+
+    type B = (F1::B, F2::B);
+
+    type M = (F1::M, F2::M);
+
+    fn new() -> Self {
+        Par2 {
+            f1: F1::new(),
+            f2: F2::new(),
+        }
+    }
+
+    fn empty(self: &Self) -> Self::M {
+        (self.f1.empty(), self.f2.empty())
+    }
+
+    fn step(self: &Self, x: &Self::A, (acc1, acc2): &mut (<F1 as Fold>::M, <F2 as Fold>::M)) {
+        self.f1.step(x, acc1);
+        self.f2.step(x, acc2);
+    }
+
+    fn output(self: &Self, (acc1, acc2): Self::M) -> Self::B {
+        (self.f1.output(acc1), self.f2.output(acc2))
+    }
+}
+
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
-    let summer = Sum::new();
-    let total = run_fold(summer, xs.clone().into_iter());
-    let max = run_fold1(Max::new(), xs.into_iter());
-    println!("Sum : {total}");
-    println!("Max : {}", max.unwrap());
+    let fld = Par2::<Sum<_>, Sum<_>>::new();
+
+    let (s1, s2) = run_fold(fld, xs.into_iter());
+
+    println!("Sum : {}, {}", s1, s2);
 }
