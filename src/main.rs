@@ -168,7 +168,7 @@ impl<A> Fold1 for Last<A> {
         x
     }
 
-    fn step(self: &Self, x: A, mut acc: &mut A) {
+    fn step(self: &Self, x: A, acc: &mut A) {
         *acc = x;
     }
 
