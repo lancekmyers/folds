@@ -5,8 +5,6 @@ trait Fold {
     type B;
     type M;
 
-    fn new() -> Self;
-
     fn empty(self: &Self) -> Self::M;
     fn step(self: &Self, x: Self::A, acc: &mut Self::M);
     fn output(self: &Self, acc: Self::M) -> Self::B;
@@ -23,7 +21,6 @@ trait Fold1 {
     type B;
     type M;
 
-    fn new() -> Self;
     fn init(self: &Self, x: Self::A) -> Self::M;
     fn step(self: &Self, x: Self::A, acc: &mut Self::M);
     fn output(self: &Self, acc: Self::M) -> Self::B;
@@ -48,10 +45,6 @@ impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
     type B = A;
     type M = A;
 
-    fn new() -> Self {
-        Sum { ghost: PhantomData }
-    }
-
     fn empty(self: &Self) -> Self::M {
         From::from(0)
     }
@@ -75,10 +68,6 @@ impl<A: std::cmp::Ord> Fold1 for Max<A> {
     type B = A;
 
     type M = A;
-
-    fn new() -> Self {
-        Max { ghost: PhantomData }
-    }
 
     fn init(self: &Self, x: A) -> Self::M {
         x
@@ -107,10 +96,6 @@ impl<A: std::cmp::Ord> Fold1 for Min<A> {
 
     type M = A;
 
-    fn new() -> Self {
-        Min { ghost: PhantomData }
-    }
-
     fn init(self: &Self, x: A) -> Self::M {
         x
     }
@@ -136,10 +121,6 @@ impl<A> Fold1 for First<A> {
     type B = A;
     type M = A;
 
-    fn new() -> Self {
-        First { ghost: PhantomData }
-    }
-
     fn init(self: &Self, x: A) -> Self::M {
         x
     }
@@ -159,10 +140,6 @@ impl<A> Fold1 for Last<A> {
     type A = A;
     type B = A;
     type M = A;
-
-    fn new() -> Self {
-        Last { ghost: PhantomData }
-    }
 
     fn init(self: &Self, x: A) -> Self::M {
         x
@@ -189,13 +166,6 @@ impl<I: Copy, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
 
     type M = (F1::M, F2::M);
 
-    fn new() -> Self {
-        Par2 {
-            f1: F1::new(),
-            f2: F2::new(),
-        }
-    }
-
     fn empty(self: &Self) -> Self::M {
         (self.f1.empty(), self.f2.empty())
     }
@@ -217,13 +187,6 @@ impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
 
     type M = (F1::M, F2::M);
 
-    fn new() -> Self {
-        Par2 {
-            f1: F1::new(),
-            f2: F2::new(),
-        }
-    }
-
     fn init(self: &Self, x: Self::A) -> Self::M {
         let i1 = self.f1.init(x);
         let i2 = self.f2.init(x);
@@ -241,9 +204,53 @@ impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
     }
 }
 
+struct FilteredFold<F: Fold> {
+    inner: F,
+    pred: dyn Fn(F::A) -> bool,
+}
+
+impl<F: Fold> Fold for FilteredFold<F>
+where
+    F::A: Copy,
+{
+    type A = F::A;
+    type B = F::B;
+    type M = F::M;
+
+    fn empty(self: &Self) -> Self::M {
+        self.inner.empty()
+    }
+
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
+        if (self.pred)(x) {
+            self.inner.step(x, acc)
+        }
+    }
+
+    fn output(self: &Self, acc: Self::M) -> Self::B {
+        self.inner.output(acc)
+    }
+}
+
+fn mk_summer<A: std::ops::AddAssign + From<u32>>() -> Sum<A> {
+    Sum { ghost: PhantomData }
+}
+
+fn mk_minner<A: std::cmp::Ord>() -> Min<A> {
+    Min { ghost: PhantomData }
+}
+
+fn mk_maxer<A: std::cmp::Ord>() -> Max<A> {
+    Max { ghost: PhantomData }
+}
+
+fn par<F1: Fold, F2: Fold>(f1: F1, f2: F2) -> Par2<F1, F2> {
+    Par2 { f1: f1, f2: f2 }
+}
+
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
-    let fld = Par2::<Sum<_>, Sum<_>>::new();
+    let fld = par(mk_summer(), mk_summer());
 
     let (s1, s2) = run_fold(fld, xs.into_iter());
 
