@@ -11,6 +11,34 @@ trait Fold1 {
     fn init(self: &Self, x: Self::A) -> Self::M;
     fn step(self: &Self, x: Self::A, acc: &mut Self::M);
     fn output(self: &Self, acc: Self::M) -> Self::B;
+
+    fn group_by<GetKey, Key>(self: Self, get_key: GetKey) -> GroupedFold<Self, GetKey>
+    where
+        Self: Sized,
+        Key: Hash + Eq,
+        GetKey: Fn(&Self::A) -> Key,
+    {
+        GroupedFold {
+            inner: self,
+            get_key,
+        }
+    }
+
+    fn filter<Pred>(self: Self, pred: Pred) -> FilteredFold<Self, Pred>
+    where
+        Self: Sized,
+        Pred: Fn(&Self::A) -> bool,
+    {
+        FilteredFold { inner: self, pred }
+    }
+
+    fn par<F2>(self: Self, f2: F2) -> Par2<Self, F2>
+    where
+        F2: Fold1<A = Self::A> + Sized,
+        Self: Sized,
+    {
+        Par2 { f1: self, f2: f2 }
+    }
 }
 
 trait Fold: Fold1 {
@@ -299,23 +327,6 @@ fn par_<F1: Fold1, F2: Fold1>(f1: F1, f2: F2) -> Par2<F1, F2> {
     Par2 { f1: f1, f2: f2 }
 }
 
-fn filter<F: Fold, P: Fn(&F::A) -> bool>(fld: F, pred: P) -> FilteredFold<F, P> {
-    FilteredFold {
-        inner: fld,
-        pred: pred,
-    }
-}
-
-fn group_by<F: Fold1, K: Hash + Eq, GetKey: Fn(&F::A) -> K>(
-    fld: F,
-    get_key: GetKey,
-) -> GroupedFold<F, GetKey> {
-    GroupedFold {
-        inner: fld,
-        get_key: get_key,
-    }
-}
-
 // This is a simple version of a scan that doesn't really work
 // because filtered folds will break.
 // Consider scan(filtered(summer, is_odd), xs)
@@ -334,12 +345,11 @@ where
 
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
-    let fld = par(
-        filter(Sum::SUM, |x| x % 2 == 0),
-        group_by(Sum::SUM, |x| x % 2),
-    );
+    let fld = Sum::SUM
+        .filter(|x| x % 2 == 0)
+        .par(Sum::SUM.group_by(|x| x % 2));
 
-    let fld1 = par_(Min::MIN, Max::MAX);
+    let fld1 = Min::MIN.par(Max::MAX);
 
     let (s1, s2) = run_fold(fld, xs.clone().into_iter());
 
