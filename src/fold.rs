@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use std::collections::HashMap;
 
-/// Trait representing that something can be seen as a "fold1", ie
+/// Trait representing that something can be seen as a "fold1", i.e.
 /// a fold that will always be given at least one input.
 pub trait Fold1 {
     /// Input type
@@ -19,10 +19,12 @@ pub trait Fold1 {
     fn step(&self, x: Self::A, acc: &mut Self::M);
     /// Final step to clean up internal state and present it to the
     /// outside world.
-    /// Often this is simply identity if no transformation needs to happen
+    /// Often this is simply the identity function if no transformation
+    /// needs to happen.
     fn output(&self, acc: Self::M) -> Self::B;
 
     /// Perform fold grouped by a key.
+    /// Resulting output type is a HashMap
     fn group_by<GetKey, Key>(self, get_key: GetKey) -> GroupedFold<Self, GetKey>
     where
         Self: Sized,
@@ -71,7 +73,7 @@ pub trait Fold1 {
         }
     }
 
-    /// Apply a function to the outpuy.
+    /// Apply a function to the output.
     /// Note that this changes the output type of the fold.
     /// This is a covariant functor fmap
     fn post_map<B2, PostFunc>(self, post_func: PostFunc) -> PostMap<Self, B2, PostFunc>
