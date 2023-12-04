@@ -3,22 +3,6 @@ use std::marker::PhantomData;
 
 use std::collections::HashMap;
 
-trait Fold {
-    type A;
-    type B;
-    type M;
-
-    fn empty(self: &Self) -> Self::M;
-    fn step(self: &Self, x: Self::A, acc: &mut Self::M);
-    fn output(self: &Self, acc: Self::M) -> Self::B;
-}
-
-fn run_fold<I, O>(fold: impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
-    let mut acc = fold.empty();
-    xs.for_each(|i| fold.step(i, &mut acc));
-    return fold.output(acc);
-}
-
 trait Fold1 {
     type A;
     type B;
@@ -27,6 +11,16 @@ trait Fold1 {
     fn init(self: &Self, x: Self::A) -> Self::M;
     fn step(self: &Self, x: Self::A, acc: &mut Self::M);
     fn output(self: &Self, acc: Self::M) -> Self::B;
+}
+
+trait Fold: Fold1 {
+    fn empty(self: &Self) -> Self::M;
+}
+
+fn run_fold<I, O>(fold: impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
+    let mut acc = fold.empty();
+    xs.for_each(|i| fold.step(i, &mut acc));
+    return fold.output(acc);
 }
 
 fn run_fold1<I, O>(fold: impl Fold1<A = I, B = O>, mut xs: impl Iterator<Item = I>) -> Option<O> {
@@ -39,36 +33,6 @@ fn run_fold1<I, O>(fold: impl Fold1<A = I, B = O>, mut xs: impl Iterator<Item = 
     }
 }
 
-struct Fold1FromFold<F: Fold> {
-    fld: F,
-}
-
-impl<F: Fold> Fold1 for Fold1FromFold<F> {
-    type A = F::A;
-    type B = F::B;
-    type M = F::M;
-
-    fn init(self: &Self, x: Self::A) -> Self::M {
-        let mut acc = self.fld.empty();
-        self.step(x, &mut acc);
-        return acc;
-    }
-
-    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
-        self.fld.step(x, acc)
-    }
-
-    fn output(self: &Self, acc: Self::M) -> Self::B {
-        self.fld.output(acc)
-    }
-}
-
-impl<F: Fold> From<F> for Fold1FromFold<F> {
-    fn from(value: F) -> Self {
-        Fold1FromFold { fld: value }
-    }
-}
-
 struct Sum<A> {
     ghost: PhantomData<A>,
 }
@@ -77,21 +41,27 @@ impl<A: std::ops::AddAssign<A> + From<u32>> Sum<A> {
     const SUM: Self = Sum { ghost: PhantomData };
 }
 
-impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
+impl<A: std::ops::AddAssign> Fold1 for Sum<A> {
     type A = A;
     type B = A;
     type M = A;
 
-    fn empty(self: &Self) -> Self::M {
-        From::from(0)
+    fn init(self: &Self, x: Self::A) -> Self::M {
+        x
     }
 
-    fn step(self: &Self, x: A, acc: &mut A) {
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
         *acc += x
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
         acc
+    }
+}
+
+impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
+    fn empty(self: &Self) -> Self::M {
+        From::from(0)
     }
 }
 
@@ -212,27 +182,6 @@ struct Par2<F1, F2> {
     f2: F2,
 }
 
-impl<I: Copy, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
-    type A = I;
-
-    type B = (F1::B, F2::B);
-
-    type M = (F1::M, F2::M);
-
-    fn empty(self: &Self) -> Self::M {
-        (self.f1.empty(), self.f2.empty())
-    }
-
-    fn step(self: &Self, x: Self::A, (acc1, acc2): &mut (<F1 as Fold>::M, <F2 as Fold>::M)) {
-        self.f1.step(x, acc1);
-        self.f2.step(x, acc2);
-    }
-
-    fn output(self: &Self, (acc1, acc2): Self::M) -> Self::B {
-        (self.f1.output(acc1), self.f2.output(acc2))
-    }
-}
-
 impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
     type A = I;
     type B = (F1::B, F2::B);
@@ -252,19 +201,21 @@ impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
     }
 }
 
-struct FilteredFold<F: Fold, P: Fn(&F::A) -> bool> {
+impl<I: Copy, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
+    fn empty(self: &Self) -> Self::M {
+        (self.f1.empty(), self.f2.empty())
+    }
+}
+
+struct FilteredFold<F, P> {
     inner: F,
     pred: P,
 }
 
-impl<F: Fold, P: Fn(&F::A) -> bool> Fold for FilteredFold<F, P> {
+impl<F: Fold1, P: Fn(&F::A) -> bool> Fold1 for FilteredFold<F, P> {
     type A = F::A;
     type B = F::B;
     type M = F::M;
-
-    fn empty(self: &Self) -> Self::M {
-        self.inner.empty()
-    }
 
     fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
         if (self.pred)(&x) {
@@ -275,33 +226,56 @@ impl<F: Fold, P: Fn(&F::A) -> bool> Fold for FilteredFold<F, P> {
     fn output(self: &Self, acc: Self::M) -> Self::B {
         self.inner.output(acc)
     }
+
+    fn init(self: &Self, x: Self::A) -> Self::M {
+        self.inner.init(x)
+    }
 }
 
-struct GroupedFold<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> {
+impl<F: Fold, P: Fn(&F::A) -> bool> Fold for FilteredFold<F, P> {
+    fn empty(self: &Self) -> Self::M {
+        self.inner.empty()
+    }
+}
+
+struct GroupedFold<F, GetKey> {
     inner: F,
     get_key: GetKey,
 }
 
-impl<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold for GroupedFold<F, Key, GetKey> {
+impl<F: Fold1, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold1 for GroupedFold<F, GetKey>
+where
+    F::A: Copy, // This should not be necessary
+{
     type A = F::A;
     type B = HashMap<Key, F::B>;
     type M = HashMap<Key, F::M>;
 
-    fn empty(self: &Self) -> Self::M {
+    fn init(self: &Self, x: Self::A) -> Self::M {
         HashMap::new()
     }
 
     fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
         let key = (self.get_key)(&x);
-        // accumulator for the relevant group
-        let acc_group = acc.entry(key).or_insert(self.inner.empty());
-        self.inner.step(x, acc_group);
+
+        acc.entry(key)
+            .and_modify(|v| self.inner.step(x, v))
+            .or_insert(self.inner.init(x));
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
         acc.into_iter()
             .map(|(k, m)| (k, self.inner.output(m)))
             .collect()
+    }
+}
+
+impl<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold for GroupedFold<F, GetKey>
+where
+    F::A: Copy,
+{
+    fn empty(self: &Self) -> Self::M {
+        HashMap::new()
     }
 }
 
@@ -332,10 +306,10 @@ fn filter<F: Fold, P: Fn(&F::A) -> bool>(fld: F, pred: P) -> FilteredFold<F, P> 
     }
 }
 
-fn group_by<F: Fold, K: Hash + Eq, GetKey: Fn(&F::A) -> K>(
+fn group_by<F: Fold1, K: Hash + Eq, GetKey: Fn(&F::A) -> K>(
     fld: F,
     get_key: GetKey,
-) -> GroupedFold<F, K, GetKey> {
+) -> GroupedFold<F, GetKey> {
     GroupedFold {
         inner: fld,
         get_key: get_key,
