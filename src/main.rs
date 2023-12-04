@@ -417,6 +417,36 @@ where
     })
 }
 
+struct Count<A> {
+    ghost: PhantomData<A>,
+}
+
+impl<A> Count<A> {
+    const COUNT: Self = Count { ghost: PhantomData };
+}
+
+impl<A> Fold1 for Count<A> {
+    type A = A;
+    type B = u64;
+    type M = u64;
+
+    fn init(self: &Self, _x: Self::A) -> Self::M {
+        1
+    }
+    fn step(self: &Self, _x: Self::A, acc: &mut Self::M) {
+        *acc += 1;
+    }
+    fn output(self: &Self, acc: Self::M) -> Self::B {
+        acc
+    }
+}
+
+impl<A> Fold for Count<A> {
+    fn empty(self: &Self) -> Self::M {
+        0
+    }
+}
+
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
     let fld = Sum::SUM
@@ -431,4 +461,10 @@ fn main() {
 
     println!("Sum : {}, {:?}", s1, s2);
     println!("Min : {}, Max {}", min, max);
+
+    let avger = Count::COUNT
+        .par(Sum::<f64>::SUM)
+        .post_map(|(n, sum)| sum / (n as f64));
+    let avg = run_fold(avger, (vec![1.0, 2.4, 1.3, 5.1]).into_iter());
+    println!("Avg : {avg}")
 }
