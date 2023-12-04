@@ -319,14 +319,6 @@ fn mk_maxer<A: std::cmp::Ord>() -> Max<A> {
     Max { ghost: PhantomData }
 }
 
-fn par<F1: Fold, F2: Fold>(f1: F1, f2: F2) -> Par2<F1, F2> {
-    Par2 { f1: f1, f2: f2 }
-}
-
-fn par_<F1: Fold1, F2: Fold1>(f1: F1, f2: F2) -> Par2<F1, F2> {
-    Par2 { f1: f1, f2: f2 }
-}
-
 // This is a simple version of a scan that doesn't really work
 // because filtered folds will break.
 // Consider scan(filtered(summer, is_odd), xs)
