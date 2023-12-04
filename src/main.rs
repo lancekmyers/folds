@@ -248,11 +248,9 @@ impl<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold for GroupedFold<F, 
 
     fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
         let key = (self.get_key)(&x);
-        if let Some(acc_group) = acc.get_mut(&key) {
-            self.inner.step(x, acc_group)
-        } else {
-            let _ = acc.insert(key, self.inner.empty());
-        }
+        // accumulator for the relevant group
+        let acc_group = acc.entry(key).or_insert(self.inner.empty());
+        self.inner.step(x, acc_group);
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
@@ -285,11 +283,24 @@ fn filter<F: Fold, P: Fn(&F::A) -> bool>(fld: F, pred: P) -> FilteredFold<F, P> 
     }
 }
 
+fn group_by<F: Fold, K: Hash + Eq, GetKey: Fn(&F::A) -> K>(
+    fld: F,
+    get_key: GetKey,
+) -> GroupedFold<F, K, GetKey> {
+    GroupedFold {
+        inner: fld,
+        get_key: get_key,
+    }
+}
+
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
-    let fld = par(mk_summer(), filter(mk_summer(), |x| x % 2 == 0));
+    let fld = par(
+        filter(mk_summer(), |x| x % 2 == 0),
+        group_by(mk_summer(), |x| x % 2),
+    );
 
     let (s1, s2) = run_fold(fld, xs.into_iter());
 
-    println!("Sum : {}, {}", s1, s2);
+    println!("Sum : {}, {:?}", s1, s2);
 }
