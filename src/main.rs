@@ -302,7 +302,7 @@ where
     type B = HashMap<Key, F::B>;
     type M = HashMap<Key, F::M>;
 
-    fn init(self: &Self, x: Self::A) -> Self::M {
+    fn init(self: &Self, _x: Self::A) -> Self::M {
         HashMap::new()
     }
 
@@ -389,18 +389,6 @@ impl<F: Fold, B2, PostFunc: Fn(F::B) -> B2> Fold for PostMap<F, B2, PostFunc> {
     }
 }
 
-fn mk_summer<A: std::ops::AddAssign + From<u32>>() -> Sum<A> {
-    Sum { ghost: PhantomData }
-}
-
-fn mk_minner<A: std::cmp::Ord>() -> Min<A> {
-    Min { ghost: PhantomData }
-}
-
-fn mk_maxer<A: std::cmp::Ord>() -> Max<A> {
-    Max { ghost: PhantomData }
-}
-
 // This is a simple version of a scan that doesn't really work
 // because filtered folds will break.
 // Consider scan(filtered(summer, is_odd), xs)
@@ -459,8 +447,12 @@ fn main() {
 
     let (min, max) = run_fold1(fld1, xs.clone().into_iter()).unwrap();
 
+    let (fst, lst) = run_fold1(First::FIRST.par(Last::LAST), xs.into_iter()).unwrap();
+
     println!("Sum : {}, {:?}", s1, s2);
     println!("Min : {}, Max {}", min, max);
+
+    println!("First : {}, Last {}", fst, lst);
 
     let avger = Count::COUNT
         .par(Sum::<f64>::SUM)
