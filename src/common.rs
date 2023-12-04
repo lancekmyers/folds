@@ -15,21 +15,21 @@ impl<A: std::ops::AddAssign> Fold1 for Sum<A> {
     type B = A;
     type M = A;
 
-    fn init(self: &Self, x: Self::A) -> Self::M {
+    fn init(&self, x: Self::A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
+    fn step(&self, x: Self::A, acc: &mut Self::M) {
         *acc += x
     }
 
-    fn output(self: &Self, acc: Self::M) -> Self::B {
+    fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
 }
 
 impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
-    fn empty(self: &Self) -> Self::M {
+    fn empty(&self) -> Self::M {
         From::from(0)
     }
 }
@@ -49,18 +49,18 @@ impl<A: std::cmp::Ord> Fold1 for Max<A> {
 
     type M = A;
 
-    fn init(self: &Self, x: A) -> Self::M {
+    fn init(&self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: A, acc: &mut A) -> () {
+    fn step(&self, x: A, acc: &mut A) {
         if x < *acc {
         } else {
             *acc = x;
         }
     }
 
-    fn output(self: &Self, acc: Self::M) -> Self::B {
+    fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
 }
@@ -80,18 +80,18 @@ impl<A: std::cmp::Ord> Fold1 for Min<A> {
 
     type M = A;
 
-    fn init(self: &Self, x: A) -> Self::M {
+    fn init(&self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: A, acc: &mut A) {
+    fn step(&self, x: A, acc: &mut A) {
         if x > *acc {
         } else {
             *acc = x;
         }
     }
 
-    fn output(self: &Self, acc: Self::M) -> Self::B {
+    fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
 }
@@ -109,13 +109,13 @@ impl<A> Fold1 for First<A> {
     type B = A;
     type M = A;
 
-    fn init(self: &Self, x: A) -> Self::M {
+    fn init(&self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, _x: A, _acc: &mut A) {}
+    fn step(&self, _x: A, _acc: &mut A) {}
 
-    fn output(self: &Self, acc: Self::M) -> Self::B {
+    fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
 }
@@ -133,15 +133,15 @@ impl<A> Fold1 for Last<A> {
     type B = A;
     type M = A;
 
-    fn init(self: &Self, x: A) -> Self::M {
+    fn init(&self, x: A) -> Self::M {
         x
     }
 
-    fn step(self: &Self, x: A, acc: &mut A) {
+    fn step(&self, x: A, acc: &mut A) {
         *acc = x;
     }
 
-    fn output(self: &Self, acc: Self::M) -> Self::B {
+    fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
 }
@@ -159,19 +159,19 @@ impl<A> Fold1 for Count<A> {
     type B = u64;
     type M = u64;
 
-    fn init(self: &Self, _x: Self::A) -> Self::M {
+    fn init(&self, _x: Self::A) -> Self::M {
         1
     }
-    fn step(self: &Self, _x: Self::A, acc: &mut Self::M) {
+    fn step(&self, _x: Self::A, acc: &mut Self::M) {
         *acc += 1;
     }
-    fn output(self: &Self, acc: Self::M) -> Self::B {
+    fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
 }
 
 impl<A> Fold for Count<A> {
-    fn empty(self: &Self) -> Self::M {
+    fn empty(&self) -> Self::M {
         0
     }
 }
