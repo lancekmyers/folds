@@ -39,6 +39,26 @@ fn run_fold1<I, O>(fold: impl Fold1<A = I, B = O>, mut xs: impl Iterator<Item = 
     }
 }
 
+impl<F: Fold> Fold1 for F {
+    type A = F::A;
+    type B = F::B;
+    type M = F::M;
+
+    fn init(self: &Self, x: Self::A) -> Self::M {
+        let mut acc = self.empty();
+        self.step(x, &mut acc);
+        return acc;
+    }
+
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
+        self.step(x, acc)
+    }
+
+    fn output(self: &Self, acc: Self::M) -> Self::B {
+        self.output(acc)
+    }
+}
+
 struct Sum<A> {
     ghost: PhantomData<A>,
 }
@@ -180,30 +200,6 @@ impl<I: Copy, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
 
     fn output(self: &Self, (acc1, acc2): Self::M) -> Self::B {
         (self.f1.output(acc1), self.f2.output(acc2))
-    }
-}
-
-impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
-    type A = I;
-
-    type B = (F1::B, F2::B);
-
-    type M = (F1::M, F2::M);
-
-    fn init(self: &Self, x: Self::A) -> Self::M {
-        let i1 = self.f1.init(x);
-        let i2 = self.f2.init(x);
-
-        (i1, i2)
-    }
-
-    fn step(self: &Self, x: Self::A, (acc1, acc2): &mut Self::M) {
-        self.f1.step(x, acc1);
-        self.f2.step(x, acc2);
-    }
-
-    fn output(self: &Self, (a1, a2): Self::M) -> Self::B {
-        (self.f1.output(a1), self.f2.output(a2))
     }
 }
 
