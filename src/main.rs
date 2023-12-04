@@ -39,6 +39,29 @@ trait Fold1 {
     {
         Par2 { f1: self, f2: f2 }
     }
+
+    fn pre_map<A2, PreFunc>(self: Self, pre_func: PreFunc) -> PreMap<Self, A2, PreFunc>
+    where
+        Self: Sized,
+        PreFunc: Fn(A2) -> Self::A,
+    {
+        PreMap {
+            inner: self,
+            pre_func: pre_func,
+            ghost: PhantomData::<A2>,
+        }
+    }
+
+    fn post_map<B2, PostFunc>(self: Self, post_func: PostFunc) -> PostMap<Self, B2, PostFunc>
+    where
+        Self: Sized,
+        PostFunc: Fn(Self::B) -> B2,
+    {
+        PostMap {
+            inner: self,
+            post_func: post_func,
+        }
+    }
 }
 
 trait Fold: Fold1 {
@@ -304,6 +327,65 @@ where
 {
     fn empty(self: &Self) -> Self::M {
         HashMap::new()
+    }
+}
+
+struct PreMap<F: Fold1, A2, PreFunc: Fn(A2) -> F::A> {
+    inner: F,
+    pre_func: PreFunc,
+    ghost: PhantomData<A2>,
+}
+
+impl<F: Fold1, A2, PreFunc: Fn(A2) -> F::A> Fold1 for PreMap<F, A2, PreFunc> {
+    type A = A2;
+    type B = F::B;
+    type M = F::M;
+
+    fn init(self: &Self, x: Self::A) -> Self::M {
+        self.inner.init((self.pre_func)(x))
+    }
+
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
+        self.inner.step((self.pre_func)(x), acc)
+    }
+
+    fn output(self: &Self, acc: Self::M) -> Self::B {
+        self.inner.output(acc)
+    }
+}
+
+impl<F: Fold, A2, PreFunc: Fn(A2) -> F::A> Fold for PreMap<F, A2, PreFunc> {
+    fn empty(self: &Self) -> Self::M {
+        self.inner.empty()
+    }
+}
+
+struct PostMap<F: Fold1, B2, PostFunc: Fn(F::B) -> B2> {
+    inner: F,
+    post_func: PostFunc,
+}
+
+impl<F: Fold1, B2, PostFunc: Fn(F::B) -> B2> Fold1 for PostMap<F, B2, PostFunc> {
+    type A = F::A;
+    type B = B2;
+    type M = F::M;
+
+    fn init(self: &Self, x: Self::A) -> Self::M {
+        self.inner.init(x)
+    }
+
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
+        self.inner.step(x, acc)
+    }
+
+    fn output(self: &Self, acc: Self::M) -> Self::B {
+        (self.post_func)(self.inner.output(acc))
+    }
+}
+
+impl<F: Fold, B2, PostFunc: Fn(F::B) -> B2> Fold for PostMap<F, B2, PostFunc> {
+    fn empty(self: &Self) -> Self::M {
+        self.inner.empty()
     }
 }
 
