@@ -1,4 +1,7 @@
+use std::hash::Hash;
 use std::marker::PhantomData;
+
+use std::collections::HashMap;
 
 trait Fold {
     type A;
@@ -226,6 +229,36 @@ impl<F: Fold, P: Fn(&F::A) -> bool> Fold for FilteredFold<F, P> {
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
         self.inner.output(acc)
+    }
+}
+
+struct GroupedFold<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> {
+    inner: F,
+    get_key: GetKey,
+}
+
+impl<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold for GroupedFold<F, Key, GetKey> {
+    type A = F::A;
+    type B = HashMap<Key, F::B>;
+    type M = HashMap<Key, F::M>;
+
+    fn empty(self: &Self) -> Self::M {
+        HashMap::new()
+    }
+
+    fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
+        let key = (self.get_key)(&x);
+        if let Some(acc_group) = acc.get_mut(&key) {
+            self.inner.step(x, acc_group)
+        } else {
+            let _ = acc.insert(key, self.inner.empty());
+        }
+    }
+
+    fn output(self: &Self, acc: Self::M) -> Self::B {
+        acc.into_iter()
+            .map(|(k, m)| (k, self.inner.output(m)))
+            .collect()
     }
 }
 
