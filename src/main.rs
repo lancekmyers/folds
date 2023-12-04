@@ -289,6 +289,22 @@ fn group_by<F: Fold, K: Hash + Eq, GetKey: Fn(&F::A) -> K>(
     }
 }
 
+// This is a simple version of a scan that doesn't really work
+// because filtered folds will break.
+// Consider scan(filtered(summer, is_odd), xs)
+// this will return an iterator the same length as the input
+// it wont really allow for filtering
+fn scan<F: Fold>(fld: F, iter: impl Iterator<Item = F::A>) -> impl Iterator<Item = F::B>
+where
+    F::M: Copy,
+{
+    let mut acc = fld.empty();
+    iter.map(move |x| {
+        fld.step(x, &mut acc);
+        return fld.output(acc);
+    })
+}
+
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
     let fld = par(
