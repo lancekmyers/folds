@@ -1,8 +1,5 @@
-mod common;
-mod fold;
-
-use common::*;
-use fold::*;
+use folds::common::*;
+use folds::fold::*;
 
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
