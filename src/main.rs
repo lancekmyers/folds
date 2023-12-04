@@ -204,12 +204,12 @@ impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
     }
 }
 
-struct FilteredFold<F: Fold> {
+struct FilteredFold<F: Fold, P: Fn(&F::A) -> bool> {
     inner: F,
-    pred: dyn Fn(&F::A) -> bool,
+    pred: P,
 }
 
-impl<F: Fold> Fold for FilteredFold<F> {
+impl<F: Fold, P: Fn(&F::A) -> bool> Fold for FilteredFold<F, P> {
     type A = F::A;
     type B = F::B;
     type M = F::M;
@@ -245,9 +245,16 @@ fn par<F1: Fold, F2: Fold>(f1: F1, f2: F2) -> Par2<F1, F2> {
     Par2 { f1: f1, f2: f2 }
 }
 
+fn filter<F: Fold, P: Fn(&F::A) -> bool>(fld: F, pred: P) -> FilteredFold<F, P> {
+    FilteredFold {
+        inner: fld,
+        pred: pred,
+    }
+}
+
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
-    let fld = par(mk_summer(), mk_summer());
+    let fld = par(mk_summer(), filter(mk_summer(), |x| x % 2 == 0));
 
     let (s1, s2) = run_fold(fld, xs.into_iter());
 
