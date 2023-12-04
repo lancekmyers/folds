@@ -39,28 +39,42 @@ fn run_fold1<I, O>(fold: impl Fold1<A = I, B = O>, mut xs: impl Iterator<Item = 
     }
 }
 
-impl<F: Fold> Fold1 for F {
+struct Fold1FromFold<F: Fold> {
+    fld: F,
+}
+
+impl<F: Fold> Fold1 for Fold1FromFold<F> {
     type A = F::A;
     type B = F::B;
     type M = F::M;
 
     fn init(self: &Self, x: Self::A) -> Self::M {
-        let mut acc = self.empty();
+        let mut acc = self.fld.empty();
         self.step(x, &mut acc);
         return acc;
     }
 
     fn step(self: &Self, x: Self::A, acc: &mut Self::M) {
-        self.step(x, acc)
+        self.fld.step(x, acc)
     }
 
     fn output(self: &Self, acc: Self::M) -> Self::B {
-        self.output(acc)
+        self.fld.output(acc)
+    }
+}
+
+impl<F: Fold> From<F> for Fold1FromFold<F> {
+    fn from(value: F) -> Self {
+        Fold1FromFold { fld: value }
     }
 }
 
 struct Sum<A> {
     ghost: PhantomData<A>,
+}
+
+impl<A: std::ops::AddAssign<A> + From<u32>> Sum<A> {
+    const SUM: Self = Sum { ghost: PhantomData };
 }
 
 impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
@@ -83,6 +97,10 @@ impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
 
 struct Max<A> {
     ghost: PhantomData<A>,
+}
+
+impl<A: std::cmp::Ord> Max<A> {
+    const MAX: Self = Max { ghost: PhantomData };
 }
 
 impl<A: std::cmp::Ord> Fold1 for Max<A> {
@@ -112,6 +130,10 @@ struct Min<A> {
     ghost: PhantomData<A>,
 }
 
+impl<A: std::cmp::Ord> Min<A> {
+    const MIN: Self = Min { ghost: PhantomData };
+}
+
 impl<A: std::cmp::Ord> Fold1 for Min<A> {
     type A = A;
 
@@ -139,6 +161,10 @@ struct First<A> {
     ghost: PhantomData<A>,
 }
 
+impl<A> First<A> {
+    const FIRST: Self = First { ghost: PhantomData };
+}
+
 impl<A> Fold1 for First<A> {
     type A = A;
     type B = A;
@@ -157,6 +183,10 @@ impl<A> Fold1 for First<A> {
 
 struct Last<A> {
     ghost: PhantomData<A>,
+}
+
+impl<A> Last<A> {
+    const LAST: Self = Last { ghost: PhantomData };
 }
 
 impl<A> Fold1 for Last<A> {
@@ -194,6 +224,25 @@ impl<I: Copy, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
     }
 
     fn step(self: &Self, x: Self::A, (acc1, acc2): &mut (<F1 as Fold>::M, <F2 as Fold>::M)) {
+        self.f1.step(x, acc1);
+        self.f2.step(x, acc2);
+    }
+
+    fn output(self: &Self, (acc1, acc2): Self::M) -> Self::B {
+        (self.f1.output(acc1), self.f2.output(acc2))
+    }
+}
+
+impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
+    type A = I;
+    type B = (F1::B, F2::B);
+    type M = (F1::M, F2::M);
+
+    fn init(self: &Self, x: Self::A) -> Self::M {
+        (self.f1.init(x), self.f2.init(x))
+    }
+
+    fn step(self: &Self, x: Self::A, (acc1, acc2): &mut (<F1 as Fold1>::M, <F2 as Fold1>::M)) {
         self.f1.step(x, acc1);
         self.f2.step(x, acc2);
     }
@@ -272,6 +321,10 @@ fn par<F1: Fold, F2: Fold>(f1: F1, f2: F2) -> Par2<F1, F2> {
     Par2 { f1: f1, f2: f2 }
 }
 
+fn par_<F1: Fold1, F2: Fold1>(f1: F1, f2: F2) -> Par2<F1, F2> {
+    Par2 { f1: f1, f2: f2 }
+}
+
 fn filter<F: Fold, P: Fn(&F::A) -> bool>(fld: F, pred: P) -> FilteredFold<F, P> {
     FilteredFold {
         inner: fld,
@@ -308,11 +361,16 @@ where
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
     let fld = par(
-        filter(mk_summer(), |x| x % 2 == 0),
-        group_by(mk_summer(), |x| x % 2),
+        filter(Sum::SUM, |x| x % 2 == 0),
+        group_by(Sum::SUM, |x| x % 2),
     );
 
-    let (s1, s2) = run_fold(fld, xs.into_iter());
+    let fld1 = par_(Min::MIN, Max::MAX);
+
+    let (s1, s2) = run_fold(fld, xs.clone().into_iter());
+
+    let (min, max) = run_fold1(fld1, xs.clone().into_iter()).unwrap();
 
     println!("Sum : {}, {:?}", s1, s2);
+    println!("Min : {}, Max {}", min, max);
 }
