@@ -3,15 +3,26 @@ use std::marker::PhantomData;
 
 use std::collections::HashMap;
 
+/// Trait representing that something can be seen as a "fold1", ie
+/// a fold that will always be given at least one input.
 pub trait Fold1 {
+    /// Input type
     type A;
+    // Output type
     type B;
+    /// Intermediate internal state
     type M;
 
+    /// Initialize state given first element
     fn init(&self, x: Self::A) -> Self::M;
+    /// Update rule for state given new piece of data
     fn step(&self, x: Self::A, acc: &mut Self::M);
+    /// Final step to clean up internal state and present it to the
+    /// outside world.
+    /// Often this is simply identity if no transformation needs to happen
     fn output(&self, acc: Self::M) -> Self::B;
 
+    /// Perform fold grouped by a key.
     fn group_by<GetKey, Key>(self, get_key: GetKey) -> GroupedFold<Self, GetKey>
     where
         Self: Sized,
@@ -24,6 +35,7 @@ pub trait Fold1 {
         }
     }
 
+    /// Only fold over input values satiisfying the given predicate.
     fn filter<Pred>(self, pred: Pred) -> FilteredFold<Self, Pred>
     where
         Self: Sized,
@@ -32,14 +44,21 @@ pub trait Fold1 {
         FilteredFold { inner: self, pred }
     }
 
+    /// Perform this fold in parallel with another.
+    /// The second fold must have the same (copyable) input type.
+    /// The resulting output type will be a pair.
     fn par<F2>(self, f2: F2) -> Par2<Self, F2>
     where
         F2: Fold1<A = Self::A> + Sized,
+        Self::A: Copy,
         Self: Sized,
     {
         Par2 { f1: self, f2 }
     }
 
+    /// Apply a function to all inputs.
+    /// Note that this changes the input type of the fold.
+    /// This is a contravariant functor fmap
     fn pre_map<A2, PreFunc>(self, pre_func: PreFunc) -> PreMap<Self, A2, PreFunc>
     where
         Self: Sized,
@@ -52,6 +71,9 @@ pub trait Fold1 {
         }
     }
 
+    /// Apply a function to the outpuy.
+    /// Note that this changes the output type of the fold.
+    /// This is a covariant functor fmap
     fn post_map<B2, PostFunc>(self, post_func: PostFunc) -> PostMap<Self, B2, PostFunc>
     where
         Self: Sized,
