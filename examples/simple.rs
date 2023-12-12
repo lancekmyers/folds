@@ -1,5 +1,6 @@
 use folds::common::*;
 use folds::fold::*;
+use rayon::iter::IntoParallelIterator;
 
 fn main() {
     let xs: Vec<i64> = vec![1, 2, 3, 4, 5];
@@ -20,9 +21,20 @@ fn main() {
 
     println!("First : {}, Last {}", fst, lst);
 
+    let xs = vec![
+        1.0, 2.4, 1.3, 5.1, 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+    ];
+
     let avger = Count::COUNT
         .par(Sum::<f64>::SUM)
         .post_map(|(n, sum)| sum / (n as f64));
-    let avg = run_fold(avger, (vec![1.0, 2.4, 1.3, 5.1]).into_iter());
-    println!("Avg : {avg}")
+    let avg = run_fold(avger, xs.clone().into_iter());
+    println!("Avg : {avg}");
+
+    let avger = Count::COUNT
+        .par(Sum::<f64>::SUM)
+        .post_map(|(n, sum)| sum / (n as f64));
+
+    let avg = run_par_fold(xs.into_par_iter(), avger);
+    println!("Par Avg : {avg}")
 }
