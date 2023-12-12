@@ -111,7 +111,7 @@ pub trait Fold: Fold1 {
 /// Folds whose intermediate state can be merged,
 /// allowing for parallel folds
 pub trait FoldPar: Fold1 {
-    fn merge(self, m1: &mut Self::M, m2: &Self::M);
+    fn merge(&self, m1: &mut Self::M, m2: Self::M);
 }
 
 pub fn run_fold<I, O>(fold: impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
@@ -149,7 +149,7 @@ where
         .reduce(
             || fold.empty(),
             |mut m1, m2| {
-                fold.merge(&mut m1, &m2);
+                fold.merge(&mut m1, m2);
                 m1
             },
         ),
@@ -186,6 +186,16 @@ impl<I: Copy, F1: Fold<A = I>, F2: Fold<A = I>> Fold for Par2<F1, F2> {
     }
 }
 
+impl<F1: FoldPar, F2: FoldPar> FoldPar for Par2<F1, F2>
+where
+    Par2<F1, F2>: Fold1<M = (F1::M, F2::M)>,
+{
+    fn merge(&self, (m11, m12): &mut Self::M, (m21, m22): Self::M) {
+        self.f1.merge(m11, m21);
+        self.f2.merge(m12, m22);
+    }
+}
+
 pub struct FilteredFold<F, P> {
     inner: F,
     pred: P,
@@ -214,6 +224,12 @@ impl<F: Fold1, P: Fn(&F::A) -> bool> Fold1 for FilteredFold<F, P> {
 impl<F: Fold, P: Fn(&F::A) -> bool> Fold for FilteredFold<F, P> {
     fn empty(&self) -> Self::M {
         self.inner.empty()
+    }
+}
+
+impl<F: FoldPar, P: Fn(&F::A) -> bool> FoldPar for FilteredFold<F, P> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        self.inner.merge(m1, m2)
     }
 }
 
@@ -255,6 +271,21 @@ where
 {
     fn empty(&self) -> Self::M {
         HashMap::new()
+    }
+}
+
+impl<F: FoldPar, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> FoldPar for GroupedFold<F, GetKey>
+where
+    F::A: Copy,
+{
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        for (k, v) in m2.into_iter() {
+            if let Some(v1) = m1.get_mut(&k) {
+                self.inner.merge(v1, v);
+            } else {
+                m1.insert(k, v);
+            }
+        }
     }
 }
 
