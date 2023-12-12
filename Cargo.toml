@@ -10,3 +10,6 @@ name = "folds"
 path = "src/lib.rs"
 doc = true
 crate-type = ["lib"]
+
+[dependencies]
+rayon = "1.8.0"

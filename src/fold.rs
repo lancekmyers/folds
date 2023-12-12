@@ -3,6 +3,9 @@ use std::marker::PhantomData;
 
 use std::collections::HashMap;
 
+use rayon;
+use rayon::iter::ParallelIterator;
+
 /// Trait representing that something can be seen as a "fold1", i.e.
 /// a fold that will always be given at least one input.
 pub trait Fold1 {
@@ -105,6 +108,12 @@ pub trait Fold: Fold1 {
     fn empty(&self) -> Self::M;
 }
 
+/// Folds whose intermediate state can be merged,
+/// allowing for parallel folds
+pub trait FoldPar: Fold1 {
+    fn merge(self, m1: &mut Self::M, m2: &Self::M);
+}
+
 pub fn run_fold<I, O>(fold: impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
     let mut acc = fold.empty();
     xs.for_each(|i| fold.step(i, &mut acc));
@@ -122,6 +131,29 @@ pub fn run_fold1<I, O>(
     } else {
         None
     }
+}
+
+pub fn run_par_fold<I, O, F>(iter: impl rayon::iter::ParallelIterator<Item = I>, fold: F) -> O
+where
+    F: FoldPar + Fold<A = I, B = O> + Sync + Send + Copy,
+    F::M: Send,
+{
+    fold.output(
+        iter.fold(
+            || fold.empty(),
+            |mut acc, x| {
+                fold.step(x, &mut acc);
+                acc
+            },
+        )
+        .reduce(
+            || fold.empty(),
+            |mut m1, m2| {
+                fold.merge(&mut m1, &m2);
+                m1
+            },
+        ),
+    )
 }
 
 pub struct Par2<F1, F2> {
