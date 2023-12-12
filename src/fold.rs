@@ -319,6 +319,12 @@ impl<F: Fold, A2, PreFunc: Fn(A2) -> F::A> Fold for PreMap<F, A2, PreFunc> {
     }
 }
 
+impl<F: FoldPar, A2, PreFunc: Fn(A2) -> F::A> FoldPar for PreMap<F, A2, PreFunc> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        self.inner.merge(m1, m2)
+    }
+}
+
 pub struct PostMap<F: Fold1, B2, PostFunc: Fn(F::B) -> B2> {
     inner: F,
     post_func: PostFunc,
@@ -345,6 +351,12 @@ impl<F: Fold1, B2, PostFunc: Fn(F::B) -> B2> Fold1 for PostMap<F, B2, PostFunc> 
 impl<F: Fold, B2, PostFunc: Fn(F::B) -> B2> Fold for PostMap<F, B2, PostFunc> {
     fn empty(&self) -> Self::M {
         self.inner.empty()
+    }
+}
+
+impl<F: FoldPar, B2, PostFunc: Fn(F::B) -> B2> FoldPar for PostMap<F, B2, PostFunc> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        self.inner.merge(m1, m2)
     }
 }
 
