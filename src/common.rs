@@ -34,6 +34,12 @@ impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
     }
 }
 
+impl<A: std::ops::AddAssign + From<u32>> FoldPar for Sum<A> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        *m1 += m2
+    }
+}
+
 pub struct Max<A> {
     ghost: PhantomData<A>,
 }
@@ -65,6 +71,15 @@ impl<A: std::cmp::Ord> Fold1 for Max<A> {
     }
 }
 
+impl<A: std::cmp::Ord> FoldPar for Max<A> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        if *m1 > m2 {
+        } else {
+            *m1 = m2
+        }
+    }
+}
+
 pub struct Min<A> {
     ghost: PhantomData<A>,
 }
@@ -93,6 +108,15 @@ impl<A: std::cmp::Ord> Fold1 for Min<A> {
 
     fn output(&self, acc: Self::M) -> Self::B {
         acc
+    }
+}
+
+impl<A: std::cmp::Ord> FoldPar for Min<A> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        if *m1 < m2 {
+        } else {
+            *m1 = m2
+        }
     }
 }
 
@@ -173,5 +197,11 @@ impl<A> Fold1 for Count<A> {
 impl<A> Fold for Count<A> {
     fn empty(&self) -> Self::M {
         0
+    }
+}
+
+impl<A> FoldPar for Count<A> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        *m1 += m2
     }
 }
