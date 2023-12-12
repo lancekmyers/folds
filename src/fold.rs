@@ -135,7 +135,7 @@ pub fn run_fold1<I, O>(
 
 pub fn run_par_fold<I, O, F>(iter: impl rayon::iter::ParallelIterator<Item = I>, fold: F) -> O
 where
-    F: FoldPar + Fold<A = I, B = O> + Sync + Send + Copy,
+    F: FoldPar + Fold<A = I, B = O> + Sync,
     F::M: Send,
 {
     fold.output(
