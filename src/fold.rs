@@ -86,6 +86,19 @@ pub trait Fold1 {
             post_func,
         }
     }
+
+    /// Compose two folds
+    /// This folds the second over the scan of the first
+    fn then<F2: Fold<A = Self::B>>(self, next: F2) -> ComposedFold<Self, F2>
+    where
+        Self: Sized,
+        Self::M: Copy,
+    {
+        ComposedFold {
+            first: self,
+            second: next,
+        }
+    }
 }
 
 pub trait Fold: Fold1 {
@@ -269,6 +282,51 @@ impl<F: Fold1, B2, PostFunc: Fn(F::B) -> B2> Fold1 for PostMap<F, B2, PostFunc> 
 impl<F: Fold, B2, PostFunc: Fn(F::B) -> B2> Fold for PostMap<F, B2, PostFunc> {
     fn empty(&self) -> Self::M {
         self.inner.empty()
+    }
+}
+
+pub struct ComposedFold<F1: Fold1, F2: Fold1> {
+    first: F1,
+    second: F2,
+}
+
+impl<F1: Fold1, F2: Fold1<A = F1::B>> Fold1 for ComposedFold<F1, F2>
+where
+    F1::M: Copy,
+{
+    type A = F1::A;
+
+    type B = F2::B;
+
+    type M = (F1::M, F2::M);
+
+    fn init(&self, x: Self::A) -> Self::M {
+        let m1 = self.first.init(x);
+        let m2 = self.second.init(self.first.output(m1));
+        (m1, m2)
+    }
+
+    fn step(&self, x: Self::A, acc: &mut Self::M) {
+        let (m1, m2) = acc;
+        self.first.step(x, m1);
+        let y = self.first.output(*m1);
+        self.second.step(y, m2);
+    }
+
+    fn output(&self, acc: Self::M) -> Self::B {
+        let (_m1, m2) = acc;
+        self.second.output(m2)
+    }
+}
+
+impl<F1: Fold, F2: Fold1<A = F1::B>> Fold for ComposedFold<F1, F2>
+where
+    F1::M: Copy,
+{
+    fn empty(&self) -> Self::M {
+        let m1 = self.first.empty();
+        let m2 = self.second.init(self.first.output(m1));
+        (m1, m2)
     }
 }
 
