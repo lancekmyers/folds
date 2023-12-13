@@ -238,10 +238,7 @@ pub struct GroupedFold<F, GetKey> {
     get_key: GetKey,
 }
 
-impl<F: Fold1, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold1 for GroupedFold<F, GetKey>
-where
-    F::A: Copy, // This should not be necessary
-{
+impl<F: Fold1, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold1 for GroupedFold<F, GetKey> {
     type A = F::A;
     type B = HashMap<Key, F::B>;
     type M = HashMap<Key, F::M>;
@@ -253,9 +250,11 @@ where
     fn step(&self, x: Self::A, acc: &mut Self::M) {
         let key = (self.get_key)(&x);
 
-        acc.entry(key)
-            .and_modify(|v| self.inner.step(x, v))
-            .or_insert(self.inner.init(x));
+        if let Some(m) = acc.get_mut(&key) {
+            self.inner.step(x, m);
+        } else {
+            acc.insert(key, self.inner.init(x));
+        }
     }
 
     fn output(&self, acc: Self::M) -> Self::B {
@@ -265,10 +264,7 @@ where
     }
 }
 
-impl<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold for GroupedFold<F, GetKey>
-where
-    F::A: Copy,
-{
+impl<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold for GroupedFold<F, GetKey> {
     fn empty(&self) -> Self::M {
         HashMap::new()
     }
