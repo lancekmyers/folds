@@ -26,6 +26,17 @@ pub trait Fold1 {
     /// needs to happen.
     fn output(&self, acc: Self::M) -> Self::B;
 
+    /// Update rule for state given new chunk of data
+    /// Allows for better performance via simd + better cach behaviour
+    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
+    where
+        Self::A: Copy,
+    {
+        for x in xs.iter() {
+            self.step(*x, acc)
+        }
+    }
+
     /// Perform fold grouped by a key.
     /// Resulting output type is a HashMap
     fn group_by<GetKey, Key>(self, get_key: GetKey) -> GroupedFold<Self, GetKey>
@@ -175,6 +186,14 @@ impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
         self.f2.step(x, acc2);
     }
 
+    fn step_chunk(&self, xs: &[Self::A], (acc1, acc2): &mut Self::M)
+    where
+        Self::A: Copy,
+    {
+        self.f1.step_chunk(xs, acc1);
+        self.f2.step_chunk(xs, acc2);
+    }
+
     fn output(&self, (acc1, acc2): Self::M) -> Self::B {
         (self.f1.output(acc1), self.f2.output(acc2))
     }
@@ -210,6 +229,23 @@ impl<F: Fold1, P: Fn(&F::A) -> bool> Fold1 for FilteredFold<F, P> {
         if (self.pred)(&x) {
             self.inner.step(x, acc)
         }
+    }
+
+    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
+    where
+        Self::A: Copy,
+    {
+        // This cannot be close to optimal
+        // I should not pay this allocation each time
+        // Consider passing mask to step_chunk
+        let mut xs_in = Vec::with_capacity(xs.len() / 2);
+
+        for x in xs {
+            if (self.pred)(x) {
+                xs_in.push(*x)
+            }
+        }
+        self.inner.step_chunk(&xs_in[..], acc);
     }
 
     fn output(&self, acc: Self::M) -> Self::B {
@@ -256,6 +292,11 @@ impl<F: Fold1, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold1 for GroupedFold<F
             acc.insert(key, self.inner.init(x));
         }
     }
+
+    // fn step_chunk()
+    // It should be possible to do something clever here,
+    // but if you have moderately high cardinality within
+    // each chunk, then I think it might just be overhead
 
     fn output(&self, acc: Self::M) -> Self::B {
         acc.into_iter()
