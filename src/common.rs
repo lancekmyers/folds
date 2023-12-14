@@ -6,7 +6,7 @@ pub struct Sum<A> {
     ghost: PhantomData<A>,
 }
 
-impl<A: std::ops::AddAssign<A> + From<u32>> Sum<A> {
+impl<A: std::ops::AddAssign<A> + From<u8>> Sum<A> {
     pub const SUM: Self = Sum { ghost: PhantomData };
 }
 
@@ -28,13 +28,13 @@ impl<A: std::ops::AddAssign> Fold1 for Sum<A> {
     }
 }
 
-impl<A: std::ops::AddAssign + From<u32>> Fold for Sum<A> {
+impl<A: std::ops::AddAssign + From<u8>> Fold for Sum<A> {
     fn empty(&self) -> Self::M {
         From::from(0)
     }
 }
 
-impl<A: std::ops::AddAssign + From<u32>> FoldPar for Sum<A> {
+impl<A: std::ops::AddAssign + From<u8>> FoldPar for Sum<A> {
     fn merge(&self, m1: &mut Self::M, m2: Self::M) {
         *m1 += m2
     }
