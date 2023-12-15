@@ -4,7 +4,7 @@ use folds::{
     common::*,
     fold::{run_fold, run_fold1, run_par_fold, Fold1},
 };
-use rayon::iter::IntoParallelIterator;
+use rayon::iter::{IntoParallelIterator, ParallelBridge};
 
 pub fn sum_bench(c: &mut Criterion) {
     // let summer = Sum::SUM;
@@ -20,9 +20,6 @@ pub fn sum_bench(c: &mut Criterion) {
     c.bench_function("vec-sum", move |b| {
         b.iter(|| black_box(xs.clone()).sum::<i32>())
     });
-    c.bench_function("builtin-sum", move |b| {
-        b.iter(|| black_box(0..n).sum::<i32>())
-    });
 }
 
 pub fn minmax_bench(c: &mut Criterion) {
@@ -32,14 +29,8 @@ pub fn minmax_bench(c: &mut Criterion) {
     c.bench_function("fold-minmax", |b: _| {
         b.iter(|| run_fold1(Min::MIN.par(Max::MAX), black_box(0..n)))
     });
-    // c.bench_function("par-fold-minmax", |b: _| {
-    //     b.iter(|| run_par_fold(black_box((xs.clone()[..]).par_chunks(2500)), min_max))
-    // });
     c.bench_function("vec-minmax", move |b| {
         b.iter(|| (xs.iter().min(), xs.iter().max()))
-    });
-    c.bench_function("builtin-minmax", move |b| {
-        b.iter(|| (black_box(0..n).min(), black_box(0..n).max()))
     });
 }
 
