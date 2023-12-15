@@ -10,15 +10,15 @@ pub fn sum_bench(c: &mut Criterion) {
     // let summer = Sum::SUM;
     let n = 2048;
 
-    let xs: Vec<i32> = (0..n).collect();
+    let xs: _ = (0..n).collect::<Vec<i32>>().into_iter();
     c.bench_function("fold-sum", |b: _| {
         b.iter(|| run_fold(Sum::SUM, black_box(xs.clone().into_iter())))
     });
     c.bench_function("par-fold-sum", |b: _| {
-        b.iter(|| run_par_fold(black_box(xs.clone().into_par_iter()), Sum::SUM))
+        b.iter(|| run_par_fold(black_box(xs.clone().par_bridge()), Sum::SUM))
     });
     c.bench_function("vec-sum", move |b| {
-        b.iter(|| black_box(xs.clone().iter()).sum::<i32>())
+        b.iter(|| black_box(xs.clone()).sum::<i32>())
     });
     c.bench_function("builtin-sum", move |b| {
         b.iter(|| black_box(0..n).sum::<i32>())
