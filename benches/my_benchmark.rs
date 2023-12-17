@@ -40,7 +40,7 @@ fn bench_minmax(c: &mut Criterion) {
 }
 
 fn bench_par(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Min");
+    let mut group = c.benchmark_group("Par");
 
     for n in [512, 2048, 8192, 20000] {
         let xs = (0..n).collect::<Vec<i32>>().into_iter();
