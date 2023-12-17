@@ -39,22 +39,39 @@ fn bench_minmax(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_min(c: &mut Criterion) {
+fn bench_par(c: &mut Criterion) {
     let mut group = c.benchmark_group("Min");
 
     for n in [512, 2048, 8192, 20000] {
         let xs = (0..n).collect::<Vec<i32>>().into_iter();
 
-        group.bench_with_input(BenchmarkId::new("Iterator", n), &xs, |b, xs| {
-            b.iter(move || xs.clone().min())
-        });
-
-        group.bench_with_input(BenchmarkId::new("Fold", n), &xs.clone(), |b, xs| {
+        group.bench_with_input(BenchmarkId::new("Min", n), &xs.clone(), |b, xs| {
             b.iter(move || run_fold1(Min::MIN, xs.clone()))
         });
+
+        group.bench_with_input(BenchmarkId::new("MinMax", n), &xs.clone(), |b, xs| {
+            b.iter(move || run_fold1(Min::MIN.par(Max::MAX), xs.clone()))
+        });
+
+        group.bench_with_input(BenchmarkId::new("MinMaxSum", n), &xs.clone(), |b, xs| {
+            b.iter(move || run_fold1(Min::MIN.par(Max::MAX).par(Sum::SUM), xs.clone()))
+        });
+
+        group.bench_with_input(
+            BenchmarkId::new("MinMaxSumLast", n),
+            &xs.clone(),
+            |b, xs| {
+                b.iter(move || {
+                    run_fold1(
+                        Min::MIN.par(Max::MAX).par(Sum::SUM).par(Last::LAST),
+                        xs.clone(),
+                    )
+                })
+            },
+        );
     }
     group.finish();
 }
 
-criterion_group!(benches, bench_sum, bench_minmax, bench_min);
+criterion_group!(benches, bench_sum, bench_minmax, bench_par);
 criterion_main!(benches);
