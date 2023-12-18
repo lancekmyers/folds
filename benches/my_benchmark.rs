@@ -73,5 +73,26 @@ fn bench_par(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_sum, bench_minmax, bench_par);
+fn bench_group(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Group");
+
+    for n in [512, 2048, 8192, 20000] {
+        let xs = (0..n).collect::<Vec<i32>>().into_iter();
+
+        group.bench_with_input(BenchmarkId::new("no groups", n), &xs.clone(), |b, xs| {
+            b.iter(move || run_fold(Sum::SUM, xs.clone()))
+        });
+
+        group.bench_with_input(BenchmarkId::new("2 groups", n), &xs.clone(), |b, xs| {
+            b.iter(move || run_fold(Sum::SUM.group_by(|i| i % 2), xs.clone()))
+        });
+
+        group.bench_with_input(BenchmarkId::new("4 groups", n), &xs.clone(), |b, xs| {
+            b.iter(move || run_fold(Sum::SUM.group_by(|i| i % 4), xs.clone()))
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench_sum, bench_minmax, bench_par, bench_group);
 criterion_main!(benches);
