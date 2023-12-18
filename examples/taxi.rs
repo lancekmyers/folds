@@ -4,13 +4,14 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use rayon::iter::ParallelBridge;
-use serde::{Deserialize, Serialize};
-use serde_json::{Deserializer, Value};
+// use rayon::iter::ParallelBridge;
+use serde::Deserialize;
+
+use csv;
 
 use folds::{
     self,
-    fold::{run_fold1, run_par_fold, Fold1},
+    fold::{run_fold, run_fold1, run_par_fold, Fold1},
 };
 
 #[derive(Deserialize)]
@@ -48,18 +49,22 @@ fn main() -> () {
     let path = std::env::args().nth(1).unwrap();
     let file = File::open(path).unwrap();
     let reader = BufReader::new(file);
+    let mut rdr = csv::Reader::from_reader(reader);
+    let records = rdr.deserialize().flatten();
 
-    let stream = Deserializer::from_reader(reader).into_iter::<Trip>();
-
-    let fld = folds::common::Sum::SUM
+    let fld = (folds::common::Sum::SUM
         .par(folds::common::Count::COUNT)
-        .pre_map(|x: Trip| x.passenger_count);
+        .pre_map(|x: Trip| x.passenger_count))
+    .group_by(|x| x.VendorID);
 
     rayon::ThreadPoolBuilder::new()
         .num_threads(8)
         .build_global()
         .unwrap();
 
-    let (total, cnt) = run_par_fold(stream.flatten().par_bridge(), fld);
-    println!("Average passengers: {}", total / (cnt as f32));
+    let grouped_avgs = run_fold(fld, records);
+
+    for (vendor, (total, cnt)) in grouped_avgs {
+        println!("Average passengers {vendor}: {}", total / (cnt as f32));
+    }
 }
