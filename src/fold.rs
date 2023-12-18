@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use std::marker::PhantomData;
 
+use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 
 use rayon;
@@ -278,11 +279,11 @@ pub struct GroupedFold<F, GetKey> {
 
 impl<F: Fold1, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold1 for GroupedFold<F, GetKey> {
     type A = F::A;
-    type B = HashMap<Key, F::B>;
-    type M = HashMap<Key, F::M>;
+    type B = FxHashMap<Key, F::B>;
+    type M = FxHashMap<Key, F::M>;
 
     fn init(&self, _x: Self::A) -> Self::M {
-        HashMap::new()
+        FxHashMap::default()
     }
 
     fn step(&self, x: Self::A, acc: &mut Self::M) {
@@ -309,7 +310,7 @@ impl<F: Fold1, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold1 for GroupedFold<F
 
 impl<F: Fold, Key: Hash + Eq, GetKey: Fn(&F::A) -> Key> Fold for GroupedFold<F, GetKey> {
     fn empty(&self) -> Self::M {
-        HashMap::new()
+        FxHashMap::default()
     }
 }
 
