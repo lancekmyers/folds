@@ -2,7 +2,6 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use rustc_hash::FxHashMap;
-use std::collections::HashMap;
 
 use rayon;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -126,14 +125,14 @@ pub trait FoldPar: Fold1 {
     fn merge(&self, m1: &mut Self::M, m2: Self::M);
 }
 
-pub fn run_fold<I, O>(fold: impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
+pub fn run_fold<I, O>(fold: &impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
     let mut acc = fold.empty();
     xs.for_each(|i| fold.step(i, &mut acc));
     fold.output(acc)
 }
 
 pub fn run_fold1<I, O>(
-    fold: impl Fold1<A = I, B = O>,
+    fold: &impl Fold1<A = I, B = O>,
     mut xs: impl Iterator<Item = I>,
 ) -> Option<O> {
     if let Some(first) = xs.next() {
@@ -145,10 +144,7 @@ pub fn run_fold1<I, O>(
     }
 }
 
-pub fn run_par_fold<I, O, F>(
-    iter: impl rayon::iter::ParallelIterator<Item = I> + IndexedParallelIterator,
-    fold: F,
-) -> O
+pub fn run_par_fold<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> O
 where
     F: FoldPar + Fold<A = I, B = O> + Sync,
     F::M: Send,
