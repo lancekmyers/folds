@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::collections::HashMap;
 
 use rayon;
-use rayon::iter::ParallelIterator;
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
 /// Trait representing that something can be seen as a "fold1", i.e.
 /// a fold that will always be given at least one input.
@@ -144,26 +144,28 @@ pub fn run_fold1<I, O>(
     }
 }
 
-pub fn run_par_fold<I, O, F>(iter: impl rayon::iter::ParallelIterator<Item = I>, fold: F) -> O
+pub fn run_par_fold<I, O, F>(
+    iter: impl rayon::iter::ParallelIterator<Item = I> + IndexedParallelIterator,
+    fold: F,
+) -> O
 where
     F: FoldPar + Fold<A = I, B = O> + Sync,
     F::M: Send,
 {
     fold.output(
-        iter.fold(
-            || fold.empty(),
-            |mut acc, x| {
-                fold.step(x, &mut acc);
+        iter.chunks(1024)
+            .map(|ch| {
+                let mut acc = fold.empty();
+                ch.into_iter().for_each(|i| fold.step(i, &mut acc));
                 acc
-            },
-        )
-        .reduce(
-            || fold.empty(),
-            |mut m1, m2| {
-                fold.merge(&mut m1, m2);
-                m1
-            },
-        ),
+            })
+            .reduce(
+                || fold.empty(),
+                |mut m1, m2| {
+                    fold.merge(&mut m1, m2);
+                    m1
+                },
+            ),
     )
 }
 
