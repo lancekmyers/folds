@@ -12,13 +12,17 @@ use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 
 #[tokio::main]
 async fn main() -> () {
-    let path = std::env::args().nth(1).unwrap();
+    let mut args = std::env::args();
+    let path = args.nth(1).unwrap();
     let file = tokio::fs::File::open(path).await.unwrap();
+
+    let threads: usize = args.nth(0).map(|str| str.parse().unwrap()).unwrap_or(4);
+    let batch_size: usize = args.nth(0).map(|str| str.parse().unwrap()).unwrap_or(1024);
 
     let builder = async_reader::ParquetRecordBatchStreamBuilder::new(file)
         .await
         .unwrap()
-        .with_batch_size(20_000);
+        .with_batch_size(batch_size);
 
     let file_metadata = builder.metadata().file_metadata();
     let mask = ProjectionMask::roots(file_metadata.schema_descr(), [3]);
@@ -43,7 +47,7 @@ async fn main() -> () {
             (&avg).step_chunk(col.values(), &mut acc);
             acc
         })
-        .buffered(4)
+        .buffered(threads)
         .collect()
         .await;
 
