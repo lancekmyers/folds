@@ -16,7 +16,7 @@ fn bench_sum(c: &mut Criterion) {
         });
 
         group.bench_with_input(BenchmarkId::new("Fold", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold(Sum::SUM, xs.clone()))
+            b.iter(move || run_fold(&Sum::SUM, xs.clone()))
         });
     }
     group.finish();
@@ -33,7 +33,7 @@ fn bench_minmax(c: &mut Criterion) {
         });
 
         group.bench_with_input(BenchmarkId::new("Fold", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold1(Min::MIN.par(Max::MAX), xs.clone()))
+            b.iter(move || run_fold1(&Min::MIN.par(Max::MAX), xs.clone()))
         });
     }
     group.finish();
@@ -46,15 +46,15 @@ fn bench_par(c: &mut Criterion) {
         let xs = (0..n).collect::<Vec<i32>>().into_iter();
 
         group.bench_with_input(BenchmarkId::new("Min", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold1(Min::MIN, xs.clone()))
+            b.iter(move || run_fold1(&Min::MIN, xs.clone()))
         });
 
         group.bench_with_input(BenchmarkId::new("MinMax", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold1(Min::MIN.par(Max::MAX), xs.clone()))
+            b.iter(move || run_fold1(&Min::MIN.par(Max::MAX), xs.clone()))
         });
 
         group.bench_with_input(BenchmarkId::new("MinMaxSum", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold1(Min::MIN.par(Max::MAX).par(Sum::SUM), xs.clone()))
+            b.iter(move || run_fold1(&Min::MIN.par(Max::MAX).par(Sum::SUM), xs.clone()))
         });
 
         group.bench_with_input(
@@ -63,7 +63,7 @@ fn bench_par(c: &mut Criterion) {
             |b, xs| {
                 b.iter(move || {
                     run_fold1(
-                        Min::MIN.par(Max::MAX).par(Sum::SUM).par(Last::LAST),
+                        &Min::MIN.par(Max::MAX).par(Sum::SUM).par(Last::LAST),
                         xs.clone(),
                     )
                 })
@@ -80,15 +80,15 @@ fn bench_group(c: &mut Criterion) {
         let xs = (0..n).collect::<Vec<i32>>().into_iter();
 
         group.bench_with_input(BenchmarkId::new("no groups", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold(Sum::SUM, xs.clone()))
+            b.iter(move || run_fold(&Sum::SUM, xs.clone()))
         });
 
         group.bench_with_input(BenchmarkId::new("2 groups", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold(Sum::SUM.group_by(|i| i % 2), xs.clone()))
+            b.iter(move || run_fold(&Sum::SUM.group_by(|i| i % 2), xs.clone()))
         });
 
         group.bench_with_input(BenchmarkId::new("4 groups", n), &xs.clone(), |b, xs| {
-            b.iter(move || run_fold(Sum::SUM.group_by(|i| i % 4), xs.clone()))
+            b.iter(move || run_fold(&Sum::SUM.group_by(|i| i % 4), xs.clone()))
         });
     }
     group.finish();
