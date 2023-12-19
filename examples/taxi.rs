@@ -18,7 +18,7 @@ async fn main() -> () {
     let builder = async_reader::ParquetRecordBatchStreamBuilder::new(file)
         .await
         .unwrap()
-        .with_batch_size(200000);
+        .with_batch_size(20_000);
 
     let file_metadata = builder.metadata().file_metadata();
     let mask = ProjectionMask::roots(file_metadata.schema_descr(), [3]);
@@ -31,37 +31,26 @@ async fn main() -> () {
 
     println!("Starting iteration");
 
-    let foo: Vec<(f64, u64)> = stream
+    let intermediates: Vec<(f64, u64)> = stream
         .filter_map(|x| async { x.ok() })
-        .map(|batch| {
-            tokio::spawn(async move {
-                let col = batch
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<arrow::array::Float64Array>()
-                    .unwrap();
-                let mut acc = (&avg).empty();
-                (&avg).step_chunk(col.values(), &mut acc);
-                acc
-            })
+        .map(|batch| async move {
+            let col = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<arrow::array::Float64Array>()
+                .unwrap();
+            let mut acc = (&avg).empty();
+            (&avg).step_chunk(col.values(), &mut acc);
+            acc
         })
         .buffered(4)
-        .try_collect()
-        .await
-        .unwrap();
+        .collect()
+        .await;
 
-    let bar = foo.iter().fold((&avg).empty(), |mut m1, m2| {
+    let ans = avg.output(intermediates.iter().fold((&avg).empty(), |mut m1, m2| {
         (&avg).merge(&mut m1, *m2);
         m1
-    });
-    let ans = avg.output(bar);
-    // let ans: f64 = avg.output(
-    //     foo.into_iter()
-    //         .reduce(|mut m1, m2| {
-    //             avg.merge(&mut m1, m2);
-    //             m1
-    //         })
-    //         .unwrap(),
-    // );
+    }));
+
     println!("Average passenger_count: {ans}");
 }
