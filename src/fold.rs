@@ -166,6 +166,7 @@ where
     )
 }
 
+#[derive(Copy, Clone)]
 pub struct Par2<F1, F2> {
     f1: F1,
     f2: F2,
@@ -214,6 +215,7 @@ where
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct FilteredFold<F, P> {
     inner: F,
     pred: P,
@@ -268,6 +270,7 @@ impl<F: FoldPar, P: Fn(&F::A) -> bool> FoldPar for FilteredFold<F, P> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct GroupedFold<F, GetKey> {
     inner: F,
     get_key: GetKey,
@@ -325,6 +328,7 @@ where
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct PreMap<F: Fold1, A2, PreFunc: Fn(A2) -> F::A> {
     inner: F,
     pre_func: PreFunc,
@@ -361,6 +365,7 @@ impl<F: FoldPar, A2, PreFunc: Fn(A2) -> F::A> FoldPar for PreMap<F, A2, PreFunc>
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct PostMap<F: Fold1, B2, PostFunc: Fn(F::B) -> B2> {
     inner: F,
     post_func: PostFunc,
@@ -396,6 +401,7 @@ impl<F: FoldPar, B2, PostFunc: Fn(F::B) -> B2> FoldPar for PostMap<F, B2, PostFu
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct ComposedFold<F1: Fold1, F2: Fold1> {
     first: F1,
     second: F2,

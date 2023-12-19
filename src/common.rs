@@ -2,6 +2,7 @@ use crate::fold::*;
 
 use std::marker::PhantomData;
 
+#[derive(Copy, Clone)]
 pub struct Sum<A> {
     ghost: PhantomData<A>,
 }
@@ -40,6 +41,7 @@ impl<A: std::ops::AddAssign + From<u8>> FoldPar for Sum<A> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Max<A> {
     ghost: PhantomData<A>,
 }
@@ -80,6 +82,7 @@ impl<A: std::cmp::Ord> FoldPar for Max<A> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Min<A> {
     ghost: PhantomData<A>,
 }
@@ -120,6 +123,7 @@ impl<A: std::cmp::Ord> FoldPar for Min<A> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct First<A> {
     ghost: PhantomData<A>,
 }
@@ -144,6 +148,7 @@ impl<A> Fold1 for First<A> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Last<A> {
     ghost: PhantomData<A>,
 }
@@ -170,6 +175,7 @@ impl<A> Fold1 for Last<A> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Count<A> {
     ghost: PhantomData<A>,
 }
