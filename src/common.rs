@@ -214,6 +214,13 @@ impl<A> Fold1 for Count<A> {
     fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
+
+    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
+    where
+        Self::A: Copy,
+    {
+        *acc += (xs.len() as u64);
+    }
 }
 
 impl<A> Fold for Count<A> {
