@@ -18,7 +18,7 @@ async fn main() -> () {
     let builder = async_reader::ParquetRecordBatchStreamBuilder::new(file)
         .await
         .unwrap()
-        .with_batch_size(3);
+        .with_batch_size(200000);
 
     let file_metadata = builder.metadata().file_metadata();
     let mask = ProjectionMask::roots(file_metadata.schema_descr(), [3]);
@@ -33,19 +33,22 @@ async fn main() -> () {
 
     let foo: Vec<(f64, u64)> = stream
         .filter_map(|x| async { x.ok() })
-        .map(|batch| async move {
-            let col = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<arrow::array::Float64Array>()
-                .unwrap();
-            let mut acc = (&avg).empty();
-            (&avg).step_chunk(col.values(), &mut acc);
-            acc
+        .map(|batch| {
+            tokio::spawn(async move {
+                let col = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<arrow::array::Float64Array>()
+                    .unwrap();
+                let mut acc = (&avg).empty();
+                (&avg).step_chunk(col.values(), &mut acc);
+                acc
+            })
         })
         .buffered(4)
-        .collect()
-        .await;
+        .try_collect()
+        .await
+        .unwrap();
 
     let bar = foo.iter().fold((&avg).empty(), |mut m1, m2| {
         (&avg).merge(&mut m1, *m2);
