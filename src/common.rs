@@ -11,7 +11,10 @@ impl<A: std::ops::AddAssign<A> + From<u8>> Sum<A> {
     pub const SUM: Self = Sum { ghost: PhantomData };
 }
 
-impl<A: std::ops::AddAssign> Fold1 for Sum<A> {
+impl<A: std::ops::AddAssign> Fold1 for Sum<A>
+where
+    A: for<'a> std::iter::Sum<&'a A>,
+{
     type A = A;
     type B = A;
     type M = A;
@@ -27,15 +30,28 @@ impl<A: std::ops::AddAssign> Fold1 for Sum<A> {
     fn output(&self, acc: Self::M) -> Self::B {
         acc
     }
+
+    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
+    where
+        Self::A: Copy,
+    {
+        *acc += xs.iter().sum();
+    }
 }
 
-impl<A: std::ops::AddAssign + From<u8>> Fold for Sum<A> {
+impl<A: std::ops::AddAssign + From<u8>> Fold for Sum<A>
+where
+    A: for<'a> std::iter::Sum<&'a A>,
+{
     fn empty(&self) -> Self::M {
         From::from(0)
     }
 }
 
-impl<A: std::ops::AddAssign + From<u8>> FoldPar for Sum<A> {
+impl<A: std::ops::AddAssign + From<u8>> FoldPar for Sum<A>
+where
+    A: for<'a> std::iter::Sum<&'a A>,
+{
     fn merge(&self, m1: &mut Self::M, m2: Self::M) {
         *m1 += m2
     }
