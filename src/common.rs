@@ -234,3 +234,25 @@ impl<A> FoldPar for Count<A> {
         *m1 += m2
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn iota(n: usize) -> Vec<usize> {
+        (0..n).collect()
+    }
+
+    #[test]
+    fn test() {
+        fn go(n: usize) {
+            let expected = (n * (n - 1) / 2, (0usize, n - 1));
+            let fld = Sum::SUM.par(Min::MIN.par(Max::MAX));
+            let ans = run_fold1(&fld, iota(n).into_iter());
+            assert_eq!(ans.unwrap(), expected)
+        }
+
+        for n in [2, 50, 500] {
+            go(n)
+        }
+    }
+}
