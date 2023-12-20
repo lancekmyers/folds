@@ -90,7 +90,7 @@ impl FoldPar for CM4<f64> {
         let nA = acc1.n as f64;
         let nB = acc2.n as f64;
         let nAB = nA + nB;
-        let delta = acc1.m - acc2.m;
+        let delta = acc2.m - acc1.m;
         acc1.n += acc2.n;
         acc1.m += delta * nB / nAB;
 
