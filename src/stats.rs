@@ -101,6 +101,12 @@ impl<const N: usize, A> Resevoir<N, A>
 where
     for<'a> [A; N]: TryFrom<&'a mut [A]>,
 {
+    // TODO: fast sample chunk
+
+    fn new_empty() -> Self {
+        Self::Filling(Vec::with_capacity(N))
+    }
+
     fn sample(&mut self, x: A) {
         match self {
             Resevoir::Filling(xs) => {
@@ -173,7 +179,18 @@ where
     for<'a> [A; N]: TryFrom<&'a mut [A]>,
 {
     fn empty(&self) -> Self::M {
-        let xs = Vec::with_capacity(N);
-        Resevoir::Filling(xs)
+        Resevoir::new_empty()
+    }
+}
+
+impl<const N: usize, A> FoldPar for SampleN<N, A>
+where
+    for<'a> [A; N]: TryFrom<&'a mut [A]>,
+{
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        match m2 {
+            Resevoir::Filling(xs) => xs.into_iter().for_each(|x| m1.sample(x)),
+            Resevoir::Resevoir(_, _, _, res) => res.into_iter().for_each(|x| m1.sample(x)),
+        }
     }
 }
