@@ -219,7 +219,7 @@ impl<A> Fold1 for Count<A> {
     where
         Self::A: Copy,
     {
-        *acc += (xs.len() as u64);
+        *acc += xs.len() as u64;
     }
 }
 

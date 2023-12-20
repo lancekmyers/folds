@@ -1,23 +1,23 @@
-use arrow;
+
 use folds::{
     self,
-    fold::{run_fold, run_fold1, run_par_fold, Fold, Fold1, FoldPar},
+    fold::{Fold, Fold1, FoldPar},
 };
 use parquet::arrow::async_reader;
-use parquet::arrow::{arrow_reader, ProjectionMask};
+use parquet::arrow::{ProjectionMask};
 
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{StreamExt};
 
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
+use rayon::iter::{ParallelIterator};
 
 #[tokio::main]
-async fn main() -> () {
+async fn main() {
     let mut args = std::env::args();
     let path = args.nth(1).unwrap();
     let file = tokio::fs::File::open(path).await.unwrap();
 
-    let threads: usize = args.nth(0).map(|str| str.parse().unwrap()).unwrap_or(4);
-    let batch_size: usize = args.nth(0).map(|str| str.parse().unwrap()).unwrap_or(1024);
+    let threads: usize = args.next().map(|str| str.parse().unwrap()).unwrap_or(4);
+    let batch_size: usize = args.next().map(|str| str.parse().unwrap()).unwrap_or(1024);
 
     let builder = async_reader::ParquetRecordBatchStreamBuilder::new(file)
         .await
@@ -43,16 +43,16 @@ async fn main() -> () {
                 .as_any()
                 .downcast_ref::<arrow::array::Float64Array>()
                 .unwrap();
-            let mut acc = (&avg).empty();
-            (&avg).step_chunk(col.values(), &mut acc);
+            let mut acc = avg.empty();
+            avg.step_chunk(col.values(), &mut acc);
             acc
         })
         .buffered(threads)
         .collect()
         .await;
 
-    let ans = avg.output(intermediates.iter().fold((&avg).empty(), |mut m1, m2| {
-        (&avg).merge(&mut m1, *m2);
+    let ans = avg.output(intermediates.iter().fold(avg.empty(), |mut m1, m2| {
+        avg.merge(&mut m1, *m2);
         m1
     }));
 

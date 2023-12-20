@@ -135,7 +135,7 @@ where
                     /* Skip */
                     *skip += 1;
                 }
-                if (*skip == 0) {
+                if *skip == 0 {
                     let i = rng.sample(index_dist);
                     res[i] = x;
                 }
