@@ -5,6 +5,8 @@ pub struct CM4<A> {
     ghost: std::marker::PhantomData<A>,
 }
 
+// from https://web.archive.org/web/20140423031833/http://people.xiph.org/~tterribe/notes/homs.html
+
 pub struct MState<A> {
     n: usize,
     m: A,
