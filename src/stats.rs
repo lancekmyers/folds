@@ -88,6 +88,7 @@ impl FoldPar for CM4<f64> {
     }
 }
 
+/// Resevoir sampling using algorithm L
 struct SampleN<const N: usize, A> {
     ghost: std::marker::PhantomData<A>,
 }
