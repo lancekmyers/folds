@@ -3,13 +3,21 @@ use rand::distributions::Uniform;
 use rand::Rng;
 use rand::{self, SeedableRng};
 
-// First 4 central moments
+/// First 4 central moments
+#[derive(Clone, Copy)]
 pub struct CM4<A> {
     ghost: std::marker::PhantomData<A>,
 }
 
+impl CM4<f64> {
+    pub const CM4: Self = CM4 {
+        ghost: std::marker::PhantomData,
+    };
+}
+
 // from https://web.archive.org/web/20140423031833/http://people.xiph.org/~tterribe/notes/homs.html
 
+#[derive(Clone, Copy)]
 pub struct MState<A> {
     n: usize,
     m: A,
@@ -41,13 +49,16 @@ impl Fold1 for CM4<f64> {
         let delta = x - *m;
         *n += 1;
         let denom: f64 = *n as f64;
+
         *m += delta / denom;
-        *m2 += delta / denom * delta * (denom - 1.0);
-        *m3 += delta * delta * delta * ((denom - 1.0) * (denom - 2.0) / (denom * denom))
-            - 3.0 * delta * (*m2) / denom;
+
         *m4 += delta.powi(4) * denom.powi(-3) * (denom - 1.0) * (denom.powi(2) - 3.0 * denom + 3.0)
             + 6.0 * (*m2) * (delta / denom).powi(2)
             - 4.0 * (*m3) * delta / denom;
+        *m3 += delta * delta * delta * ((denom - 1.0) * (denom - 2.0) / (denom * denom))
+            - 3.0 * delta * (*m2) / denom;
+
+        *m2 += delta / denom * delta * (denom - 1.0);
     }
 
     fn output(&self, acc: Self::M) -> Self::B {
@@ -57,6 +68,18 @@ impl Fold1 for CM4<f64> {
             acc.m3 * acc.m2.powf(1.5) * (acc.n as f64).sqrt(),
             (acc.n as f64) * acc.m4 * acc.m2.powi(-2),
         )
+    }
+}
+
+impl Fold for CM4<f64> {
+    fn empty(&self) -> Self::M {
+        MState {
+            n: 0,
+            m: 0.0,
+            m2: 0.0,
+            m3: 0.0,
+            m4: 0.0,
+        }
     }
 }
 
@@ -89,11 +112,17 @@ impl FoldPar for CM4<f64> {
 }
 
 /// Resevoir sampling using algorithm L
-struct SampleN<const N: usize, A> {
+pub struct SampleN<const N: usize, A> {
     ghost: std::marker::PhantomData<A>,
 }
 
-enum Resevoir<const N: usize, A> {
+impl<const N: usize, A> SampleN<N, A> {
+    pub const SAMPLE: Self = SampleN {
+        ghost: std::marker::PhantomData,
+    };
+}
+
+pub enum Resevoir<const N: usize, A> {
     Filling(Vec<A>),
     Resevoir(rand::rngs::SmallRng, f64, usize, [A; N]),
 }
