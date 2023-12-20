@@ -65,7 +65,7 @@ impl Fold1 for CM4<f64> {
         (
             acc.m,
             acc.m2 / ((acc.n as f64) - 1.0),
-            acc.m3 * acc.m2.powf(1.5) * (acc.n as f64).sqrt(),
+            acc.m3 * acc.m2.powf(-1.5) * (acc.n as f64).sqrt(),
             (acc.n as f64) * acc.m4 * acc.m2.powi(-2),
         )
     }
