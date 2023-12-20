@@ -166,6 +166,32 @@ where
     )
 }
 
+pub fn run_par_fold1<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> Option<O>
+where
+    F: FoldPar + Fold<A = I, B = O> + Sync,
+    F::M: Send + Copy,
+    I: Copy,
+{
+    let mut accs: Vec<_> = iter
+        .chunks(1024)
+        .map(|ch| {
+            let &x0 = ch.get(0)?;
+            let mut acc = fold.init(x0);
+            fold.step_chunk(&ch[1..], &mut acc);
+            Some(acc)
+        })
+        .filter_map(|x| x)
+        .collect();
+
+    // let mut a0 = accs.get(0)?;
+    // let mut a0 = accs[0];
+    let (a0, rest) = accs.split_first_mut()?;
+    for a in rest {
+        fold.merge(a0, *a);
+    }
+    Some(fold.output(*a0))
+}
+
 #[derive(Copy, Clone)]
 pub struct Par2<F1, F2> {
     f1: F1,
