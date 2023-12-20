@@ -202,8 +202,8 @@ impl<A> Count<A> {
 
 impl<A> Fold1 for Count<A> {
     type A = A;
-    type B = u64;
-    type M = u64;
+    type B = usize;
+    type M = usize;
 
     fn init(&self, _x: Self::A) -> Self::M {
         1
@@ -219,7 +219,7 @@ impl<A> Fold1 for Count<A> {
     where
         Self::A: Copy,
     {
-        *acc += xs.len() as u64;
+        *acc += xs.len();
     }
 }
 
@@ -243,10 +243,24 @@ mod tests {
     }
 
     #[test]
-    fn test() {
+    fn sum_min_max() {
         fn go(n: usize) {
             let expected = (n * (n - 1) / 2, (0usize, n - 1));
             let fld = Sum::SUM.par(Min::MIN.par(Max::MAX));
+            let ans = run_fold1(&fld, iota(n).into_iter());
+            assert_eq!(ans.unwrap(), expected)
+        }
+
+        for n in [2, 50, 500] {
+            go(n)
+        }
+    }
+
+    #[test]
+    fn fst_lst_cnt() {
+        fn go(n: usize) {
+            let expected = (0usize, (n - 1, n));
+            let fld = First::FIRST.par(Last::LAST.par(Count::COUNT));
             let ans = run_fold1(&fld, iota(n).into_iter());
             assert_eq!(ans.unwrap(), expected)
         }
