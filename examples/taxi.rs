@@ -1,14 +1,13 @@
-
 use folds::{
     self,
     fold::{Fold, Fold1, FoldPar},
 };
 use parquet::arrow::async_reader;
-use parquet::arrow::{ProjectionMask};
+use parquet::arrow::ProjectionMask;
 
-use futures::{StreamExt};
+use futures::StreamExt;
 
-use rayon::iter::{ParallelIterator};
+use rayon::iter::ParallelIterator;
 
 #[tokio::main]
 async fn main() {
@@ -29,13 +28,11 @@ async fn main() {
 
     let stream = builder.with_projection(mask).build().unwrap();
 
-    let avg = folds::common::Sum::SUM
-        .par(folds::common::Count::COUNT)
-        .post_map(|(tot, cnt)| tot / (cnt as f64));
+    let fld = folds::stats::CM4::CM4;
 
     println!("Starting iteration");
 
-    let intermediates: Vec<(f64, u64)> = stream
+    let intermediates: Vec<_> = stream
         .filter_map(|x| async { x.ok() })
         .map(|batch| async move {
             let col = batch
@@ -43,18 +40,18 @@ async fn main() {
                 .as_any()
                 .downcast_ref::<arrow::array::Float64Array>()
                 .unwrap();
-            let mut acc = avg.empty();
-            avg.step_chunk(col.values(), &mut acc);
+            let mut acc = fld.empty();
+            fld.step_chunk(col.values(), &mut acc);
             acc
         })
         .buffered(threads)
         .collect()
         .await;
 
-    let ans = avg.output(intermediates.iter().fold(avg.empty(), |mut m1, m2| {
-        avg.merge(&mut m1, *m2);
+    let ans = fld.output(intermediates.iter().fold(fld.empty(), |mut m1, m2| {
+        fld.merge(&mut m1, *m2);
         m1
     }));
 
-    println!("Average passenger_count: {ans}");
+    println!("Summary for passenger_count: {:?}", ans);
 }
