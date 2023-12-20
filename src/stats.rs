@@ -56,3 +56,31 @@ impl Fold1 for CM4<f64> {
         )
     }
 }
+
+impl FoldPar for CM4<f64> {
+    // todo: remove divisions by using delta / nAB
+    //   probably will not mattter and might make it harder to read
+    fn merge(&self, acc1: &mut Self::M, acc2: Self::M) {
+        let nA = acc1.n as f64;
+        let nB = acc2.n as f64;
+        let nAB = nA + nB;
+        let delta = acc1.m - acc2.m;
+        acc1.n += acc2.n;
+        acc1.m += delta * nB / nAB;
+
+        let m2A = acc1.m2;
+        let m2B = acc2.m2;
+        acc1.m2 += acc2.m2 + delta * delta * nA * nB / nAB;
+
+        acc1.m3 += acc2.m3
+            + delta.powi(3) * nA * nB * nAB.powi(-2) * (nA - nB)
+            + 3.0 * delta * (nA * m2B - nB * m2A) / nAB;
+
+        let m3A = acc1.m3;
+        let m3B = acc2.m3;
+        acc1.m4 += acc2.m4
+            + delta.powi(4) * nA * nB * (nA * nA - nA * nB + nB * nB) * nAB.powi(-3)
+            + 6.0 * delta * delta * (nA * nA * m2B + nB * nB * m2A) * nAB.powi(-2)
+            + 4.0 * delta * (nA * m3B - nB * m3A) / nAB;
+    }
+}
