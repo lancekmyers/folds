@@ -31,10 +31,7 @@ where
         acc
     }
 
-    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
-    where
-        Self::A: Copy,
-    {
+    fn step_chunk(&self, xs: Vec<Self::A>, acc: &mut Self::M) {
         *acc += xs.iter().sum();
     }
 }
@@ -215,10 +212,7 @@ impl<A> Fold1 for Count<A> {
         acc
     }
 
-    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
-    where
-        Self::A: Copy,
-    {
+    fn step_chunk(&self, xs: Vec<Self::A>, acc: &mut Self::M) {
         *acc += xs.len();
     }
 }
