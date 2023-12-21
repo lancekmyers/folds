@@ -125,13 +125,13 @@ pub trait FoldPar: Fold1 {
     fn merge(&self, m1: &mut Self::M, m2: Self::M);
 }
 
-pub fn run_fold<I, O>(fold: &impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
+pub fn run_fold_iter<I, O>(fold: &impl Fold<A = I, B = O>, xs: impl Iterator<Item = I>) -> O {
     let mut acc = fold.empty();
     xs.for_each(|i| fold.step(i, &mut acc));
     fold.output(acc)
 }
 
-pub fn run_fold1<I, O>(
+pub fn run_fold1_iter<I, O>(
     fold: &impl Fold1<A = I, B = O>,
     mut xs: impl Iterator<Item = I>,
 ) -> Option<O> {
@@ -144,7 +144,7 @@ pub fn run_fold1<I, O>(
     }
 }
 
-pub fn run_par_fold<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> O
+pub fn run_fold_par_iter<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> O
 where
     F: FoldPar + Fold<A = I, B = O> + Sync,
     F::M: Send,
@@ -166,7 +166,10 @@ where
     )
 }
 
-pub fn run_par_fold1<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> Option<O>
+pub fn run_fold1_par_iter<I, O, F>(
+    iter: impl IndexedParallelIterator<Item = I>,
+    fold: &F,
+) -> Option<O>
 where
     F: FoldPar + Fold<A = I, B = O> + Sync,
     F::M: Send + Copy,

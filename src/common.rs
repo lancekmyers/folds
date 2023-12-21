@@ -247,7 +247,7 @@ mod tests {
         fn go(n: usize) {
             let expected = (n * (n - 1) / 2, (0usize, n - 1));
             let fld = Sum::SUM.par(Min::MIN.par(Max::MAX));
-            let ans = run_fold1(&fld, iota(n).into_iter());
+            let ans = run_fold1_iter(&fld, iota(n).into_iter());
             assert_eq!(ans.unwrap(), expected)
         }
 
@@ -261,7 +261,7 @@ mod tests {
         fn go(n: usize) {
             let expected = (0usize, (n - 1, n));
             let fld = First::FIRST.par(Last::LAST.par(Count::COUNT));
-            let ans = run_fold1(&fld, iota(n).into_iter());
+            let ans = run_fold1_iter(&fld, iota(n).into_iter());
             assert_eq!(ans.unwrap(), expected)
         }
 
