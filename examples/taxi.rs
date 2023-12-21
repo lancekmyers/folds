@@ -5,7 +5,7 @@ use folds::{
 use parquet::arrow::async_reader;
 use parquet::arrow::ProjectionMask;
 
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 
 use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 
@@ -36,30 +36,22 @@ async fn main() {
 
     let intermediates: Vec<_> = stream
         .filter_map(|x| async { x.ok() })
-        .map(|batch| async move {
-            let col = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<arrow::array::Float64Array>()
-                .unwrap();
-            col.values()
-                .par_chunks(chunk_size)
-                .map(|ch| {
-                    let mut acc = fld.empty();
-                    fld.step_chunk(ch, &mut acc);
-                    acc
-                })
-                .reduce(
-                    || fld.empty(),
-                    |mut m1, m2| {
-                        fld.merge(&mut m1, m2);
-                        m1
-                    },
-                )
+        .map(|batch| {
+            tokio::spawn(async move {
+                let col = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<arrow::array::Float64Array>()
+                    .unwrap();
+                let mut acc = fld.empty();
+                fld.step_chunk(col.values(), &mut acc);
+                acc
+            })
         })
         .buffered(threads)
-        .collect()
-        .await;
+        .try_collect()
+        .await
+        .unwrap();
 
     let ans = fld.output(intermediates.iter().fold(fld.empty(), |mut m1, m2| {
         fld.merge(&mut m1, *m2);
