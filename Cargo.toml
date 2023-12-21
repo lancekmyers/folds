@@ -18,13 +18,15 @@ crate-type = ["lib"]
 rand = {version = "0.8.5", features = ["small_rng"]} 
 rayon = "1.8.0"
 rustc-hash = "1.1.0"
+futures = "*"
+tokio = { version = "1", features = ["rt"] }
+par-stream = {version ="0.10.2", features = ["runtime-tokio"]}
 
 [dev-dependencies]
 criterion = {version = "0.4", features = ["html_reports"]}
 arrow = {version = "*"}
 parquet = {version = "*", features = ["async"]}
 tokio = { version = "1", features = ["full"] }
-futures = "*"
 
 [[bench]]
 name = "my_benchmark"

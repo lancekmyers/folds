@@ -8,6 +8,8 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
 use futures::{self, Stream, StreamExt};
 
+use par_stream::prelude::*;
+
 /// Trait representing that something can be seen as a "fold1", i.e.
 /// a fold that will always be given at least one input.
 pub trait Fold1 {
@@ -155,6 +157,43 @@ pub async fn run_fold_stream<O, I>(fold: &impl Fold<A = I, B = O>, xs: impl Stre
         })
         .await,
     )
+}
+
+/// Run a fold1 over a stream of values in parallel
+pub async fn run_fold1_par_stream<O, I, F>(
+    fold: &'static F,
+    xs: impl Stream<Item = I> + par_stream::ParStreamExt,
+) -> Option<O>
+where
+    F: Fold1<A = I, B = O> + FoldPar + Sync,
+    F::M: Send,
+    I: Send + 'static,
+{
+    Some(
+        fold.output(
+            xs.par_map(None, move |x| move || fold.init(x))
+                .par_reduce(None, move |mut m1, m2| async move {
+                    fold.merge(&mut m1, m2);
+                    m1
+                })
+                .await?,
+        ),
+    )
+}
+
+/// Run a fold over a stream of values in parallel
+pub async fn run_fold_par_stream<O, I, F>(
+    fold: &'static F,
+    xs: impl Stream<Item = I> + par_stream::ParStreamExt,
+) -> O
+where
+    F: Fold<A = I, B = O> + FoldPar + Sync,
+    F::M: Send,
+    I: Send + 'static,
+{
+    run_fold1_par_stream(fold, xs)
+        .await
+        .unwrap_or(fold.output(fold.empty()))
 }
 
 pub fn run_fold_par_iter<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> O
