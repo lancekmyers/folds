@@ -6,6 +6,8 @@ use rustc_hash::FxHashMap;
 use rayon;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
+use futures::{self, Stream, StreamExt};
+
 /// Trait representing that something can be seen as a "fold1", i.e.
 /// a fold that will always be given at least one input.
 pub trait Fold1 {
@@ -142,6 +144,17 @@ pub fn run_fold1_iter<I, O>(
     } else {
         None
     }
+}
+
+/// Run a fold over a stream of values
+pub async fn run_fold_stream<O, I>(fold: &impl Fold<A = I, B = O>, xs: impl Stream<Item = I>) -> O {
+    fold.output(
+        xs.fold(fold.empty(), |mut acc, x| async move {
+            fold.step(x, &mut acc);
+            acc
+        })
+        .await,
+    )
 }
 
 pub fn run_fold_par_iter<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> O
