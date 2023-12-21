@@ -34,7 +34,7 @@ async fn main() {
 
     println!("Starting iteration");
 
-    let intermediates: Vec<_> = stream
+    let intermediate = stream
         .filter_map(|x| async { x.ok() })
         .map(|batch| {
             tokio::spawn(async move {
@@ -49,14 +49,15 @@ async fn main() {
             })
         })
         .buffered(threads)
-        .try_collect()
-        .await
-        .unwrap();
+        .fold(fld.empty(), |mut m1, m2| async move {
+            if let Ok(m2) = m2 {
+                fld.merge(&mut m1, m2);
+            }
+            m1
+        })
+        .await;
 
-    let ans = fld.output(intermediates.iter().fold(fld.empty(), |mut m1, m2| {
-        fld.merge(&mut m1, *m2);
-        m1
-    }));
+    let ans = fld.output(intermediate);
 
     println!("Summary for passenger_count: {:?}", ans);
 }
