@@ -50,15 +50,16 @@ impl Fold1 for CM4<f64> {
         *n += 1;
         let denom: f64 = *n as f64;
 
+        let delta_n = delta / (*n as f64);
+
         *m += delta / denom;
 
-        *m4 += delta.powi(4) * denom.powi(-3) * (denom - 1.0) * (denom.powi(2) - 3.0 * denom + 3.0)
-            + 6.0 * (*m2) * (delta / denom).powi(2)
-            - 4.0 * (*m3) * delta / denom;
-        *m3 += delta * delta * delta * ((denom - 1.0) * (denom - 2.0) / (denom * denom))
-            - 3.0 * delta * (*m2) / denom;
+        *m4 += delta_n.powi(3) * delta * (denom - 1.0) * (denom.powi(2) - 3.0 * denom + 3.0)
+            + 6.0 * (*m2) * delta_n.powi(2)
+            - 4.0 * (*m3) * delta_n;
+        *m3 += delta_n.powi(2) * delta * (denom - 1.0) * (denom - 2.0) - 3.0 * delta_n * (*m2);
 
-        *m2 += delta / denom * delta * (denom - 1.0);
+        *m2 += delta_n * delta * (denom - 1.0);
     }
 
     fn output(&self, acc: Self::M) -> Self::B {
