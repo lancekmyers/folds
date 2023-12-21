@@ -32,12 +32,9 @@ pub trait Fold1 {
 
     /// Update rule for state given new chunk of data
     /// Allows for better performance via simd + better cach behaviour
-    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
-    where
-        Self::A: Copy,
-    {
-        for x in xs.iter() {
-            self.step(*x, acc)
+    fn step_chunk(&self, xs: Vec<Self::A>, acc: &mut Self::M) {
+        for x in xs {
+            self.step(x, acc)
         }
     }
 
@@ -116,6 +113,14 @@ pub trait Fold1 {
             first: self,
             second: next,
         }
+    }
+
+    fn batched(self) -> Batched<Self>
+    where
+        Self: Sized,
+        Self::A: Clone,
+    {
+        Batched { inner: self }
     }
 }
 
@@ -229,10 +234,11 @@ where
 {
     let mut accs: Vec<_> = iter
         .chunks(1024)
-        .map(|ch| {
-            let &x0 = ch.get(0)?;
-            let mut acc = fold.init(x0);
-            fold.step_chunk(&ch[1..], &mut acc);
+        .map(|mut ch| {
+            let rest = ch.drain(1..).collect();
+            let x0 = ch.get(0)?;
+            let mut acc = fold.init(*x0);
+            fold.step_chunk(rest, &mut acc);
             Some(acc)
         })
         .filter_map(|x| x)
@@ -267,11 +273,11 @@ impl<I: Copy, F1: Fold1<A = I>, F2: Fold1<A = I>> Fold1 for Par2<F1, F2> {
         self.f2.step(x, acc2);
     }
 
-    fn step_chunk(&self, xs: &[Self::A], (acc1, acc2): &mut Self::M)
+    fn step_chunk(&self, xs: Vec<Self::A>, (acc1, acc2): &mut Self::M)
     where
         Self::A: Copy,
     {
-        self.f1.step_chunk(xs, acc1);
+        self.f1.step_chunk(xs.clone(), acc1);
         self.f2.step_chunk(xs, acc2);
     }
 
@@ -313,21 +319,18 @@ impl<F: Fold1, P: Fn(&F::A) -> bool> Fold1 for FilteredFold<F, P> {
         }
     }
 
-    fn step_chunk(&self, xs: &[Self::A], acc: &mut Self::M)
-    where
-        Self::A: Copy,
-    {
+    fn step_chunk(&self, xs: Vec<Self::A>, acc: &mut Self::M) {
         // This cannot be close to optimal
         // I should not pay this allocation each time
         // Consider passing mask to step_chunk
         let mut xs_in = Vec::with_capacity(xs.len() / 2);
 
         for x in xs {
-            if (self.pred)(x) {
-                xs_in.push(*x)
+            if (self.pred)(&x) {
+                xs_in.push(x)
             }
         }
-        self.inner.step_chunk(&xs_in[..], acc);
+        self.inner.step_chunk(xs_in, acc);
     }
 
     fn output(&self, acc: Self::M) -> Self::B {
@@ -543,4 +546,44 @@ where
         fld.step(x, &mut acc);
         fld.output(acc)
     })
+}
+
+pub struct Batched<F: Fold1> {
+    inner: F,
+}
+impl<A: Clone, F: Fold1<A = A>> Fold1 for Batched<F> {
+    type A = Vec<F::A>;
+
+    type B = F::B;
+
+    type M = F::M;
+
+    // this will panic on empty chunk
+    fn init(&self, mut x: Self::A) -> Self::M {
+        let rest = x.drain(1..).collect();
+        let x0 = x[0].clone();
+        let mut acc = self.inner.init(x0);
+        self.inner.step_chunk(rest, &mut acc);
+        acc
+    }
+
+    fn step(&self, x: Self::A, acc: &mut Self::M) {
+        self.inner.step_chunk(x, acc)
+    }
+
+    fn output(&self, acc: Self::M) -> Self::B {
+        self.inner.output(acc)
+    }
+}
+
+impl<A: Clone, F: Fold<A = A>> Fold for Batched<F> {
+    fn empty(&self) -> Self::M {
+        self.inner.empty()
+    }
+}
+
+impl<A: Clone, F: FoldPar<A = A>> FoldPar for Batched<F> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        self.inner.merge(m1, m2)
+    }
 }
