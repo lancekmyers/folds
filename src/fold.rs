@@ -166,7 +166,11 @@ pub async fn run_fold_stream<O, I>(fold: &impl Fold<A = I, B = O>, xs: impl Stre
 }
 
 /// Run a fold1 over a stream of values in parallel
-pub async fn run_fold_par_stream<O, I, F>(fold: &F, xs: impl ParStreamExt<Item = I>) -> Option<O>
+pub async fn run_fold_par_stream<O, I, F>(
+    fold: &F,
+    j: usize,
+    xs: impl ParStreamExt<Item = I>,
+) -> Option<O>
 where
     F: Fold<A = I, B = O> + FoldPar + Send + Sync + Clone + 'static,
     F::M: Send + Sync,
@@ -178,7 +182,7 @@ where
                 let f = fold.clone();
                 tokio::task::spawn_blocking(move || f.init(x))
             })
-            .buffered(8)
+            .buffered(j)
             .fold(fold.empty(), |mut m1, m2| async move {
                 if let Ok(m2) = m2 {
                     fold.merge(&mut m1, m2);
