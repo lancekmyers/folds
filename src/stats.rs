@@ -113,6 +113,7 @@ impl FoldPar for CM4<f64> {
 }
 
 /// Resevoir sampling using algorithm L
+#[derive(Clone, Copy)]
 pub struct SampleN<const N: usize, A> {
     ghost: std::marker::PhantomData<A>,
 }
@@ -168,6 +169,7 @@ where
                 if *skip == 0 {
                     let i = rng.sample(index_dist);
                     res[i] = x;
+                    *skip += 1;
                 }
                 *skip -= 1;
                 *w *= (rng.sample(dist).ln() / (N as f64)).exp();
