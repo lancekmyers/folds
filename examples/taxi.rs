@@ -20,7 +20,7 @@ async fn main() {
         .unwrap()
         .with_batch_size(batch_size);
 
-    let file_metadata = builder.metadata().file_metadata();
+    let file_metadata = builder.metadata().file_metadata().clone();
     let mask = ProjectionMask::roots(file_metadata.schema_descr(), [3]);
 
     let stream = builder
@@ -40,9 +40,24 @@ async fn main() {
         .par(SampleN::<20, f64>::SAMPLE)
         .batched();
 
-    println!("Starting iteration");
+    println!("Summary");
 
-    let ans = run_fold_par_stream(&fld, threads, stream);
+    for col in file_metadata.schema_descr().columns() {
+        let name = col.path().string();
+        let ty = col.physical_type();
+        println!("  {:12} {}", ty.to_string(), name)
+    }
 
-    println!("Summary for passenger_count: {:?}", ans.await);
+    println!("passenger_count");
+    if let Some(ans) = run_fold_par_stream(&fld, threads, stream).await {
+        let ((mu, var, skw, krt), sample) = ans;
+        println!(" >>     mean: {:.3}", mu);
+        println!(" >>      var: {:.3}", var);
+        println!(" >>     skew: {:.3}", skw);
+        println!(" >> kurtosis: {:.3}", krt);
+
+        if let Ok(sample) = sample {
+            println!(" >> {:?}", sample)
+        }
+    }
 }
