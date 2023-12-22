@@ -1,12 +1,13 @@
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
 use rayon;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
-use futures::{self, Stream, StreamExt};
+use futures::{self, Stream, StreamExt, TryStreamExt};
 
 use par_stream::prelude::*;
 
@@ -165,41 +166,44 @@ pub async fn run_fold_stream<O, I>(fold: &impl Fold<A = I, B = O>, xs: impl Stre
 }
 
 /// Run a fold1 over a stream of values in parallel
-pub async fn run_fold1_par_stream<O, I, F>(
-    fold: &'static F,
-    xs: impl Stream<Item = I> + par_stream::ParStreamExt,
-) -> Option<O>
+pub async fn run_fold_par_stream<O, I, F>(fold: &F, xs: impl ParStreamExt<Item = I>) -> Option<O>
 where
-    F: Fold1<A = I, B = O> + FoldPar + Sync,
-    F::M: Send,
+    F: Fold<A = I, B = O> + FoldPar + Send + Sync + Clone + 'static,
+    F::M: Send + Sync,
     I: Send + 'static,
 {
     Some(
         fold.output(
-            xs.par_map(None, move |x| move || fold.init(x))
-                .par_reduce(None, move |mut m1, m2| async move {
+            xs.map(move |x| {
+                let f = fold.clone();
+                tokio::task::spawn_blocking(move || f.init(x))
+            })
+            .buffered(8)
+            .fold(fold.empty(), |mut m1, m2| async move {
+                if let Ok(m2) = m2 {
                     fold.merge(&mut m1, m2);
-                    m1
-                })
-                .await?,
+                }
+                m1
+            })
+            .await,
         ),
     )
 }
 
-/// Run a fold over a stream of values in parallel
-pub async fn run_fold_par_stream<O, I, F>(
-    fold: &'static F,
-    xs: impl Stream<Item = I> + par_stream::ParStreamExt,
-) -> O
-where
-    F: Fold<A = I, B = O> + FoldPar + Sync,
-    F::M: Send,
-    I: Send + 'static,
-{
-    run_fold1_par_stream(fold, xs)
-        .await
-        .unwrap_or(fold.output(fold.empty()))
-}
+// /// Run a fold over a stream of values in parallel
+// pub async fn run_fold_par_stream<O, I, F>(
+//     fold: &'static F,
+//     xs: impl Stream<Item = I> + par_stream::ParStreamExt,
+// ) -> O
+// where
+//     F: Fold<A = I, B = O> + FoldPar + Sync,
+//     F::M: Send,
+//     I: Send + 'static,
+// {
+//     run_fold1_par_stream(fold, xs)
+//         .await
+//         .unwrap_or(fold.output(fold.empty()))
+// }
 
 pub fn run_fold_par_iter<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> O
 where
@@ -548,10 +552,11 @@ where
     })
 }
 
+#[derive(Clone, Copy)]
 pub struct Batched<F: Fold1> {
     inner: F,
 }
-impl<A: Clone, F: Fold1<A = A>> Fold1 for Batched<F> {
+impl<A: Clone, F: Fold<A = A>> Fold1 for Batched<F> {
     type A = Vec<F::A>;
 
     type B = F::B;
@@ -559,11 +564,9 @@ impl<A: Clone, F: Fold1<A = A>> Fold1 for Batched<F> {
     type M = F::M;
 
     // this will panic on empty chunk
-    fn init(&self, mut x: Self::A) -> Self::M {
-        let rest = x.drain(1..).collect();
-        let x0 = x[0].clone();
-        let mut acc = self.inner.init(x0);
-        self.inner.step_chunk(rest, &mut acc);
+    fn init(&self, x: Self::A) -> Self::M {
+        let mut acc = self.inner.empty();
+        self.inner.step_chunk(x, &mut acc);
         acc
     }
 
@@ -582,7 +585,7 @@ impl<A: Clone, F: Fold<A = A>> Fold for Batched<F> {
     }
 }
 
-impl<A: Clone, F: FoldPar<A = A>> FoldPar for Batched<F> {
+impl<A: Clone, F: FoldPar<A = A> + Fold> FoldPar for Batched<F> {
     fn merge(&self, m1: &mut Self::M, m2: Self::M) {
         self.inner.merge(m1, m2)
     }
