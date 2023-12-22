@@ -1,13 +1,12 @@
 use std::hash::Hash;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
 use rayon;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
-use futures::{self, Stream, StreamExt, TryStreamExt};
+use futures::{self, Stream, StreamExt};
 
 use par_stream::prelude::*;
 
@@ -165,7 +164,7 @@ pub async fn run_fold_stream<O, I>(fold: &impl Fold<A = I, B = O>, xs: impl Stre
     )
 }
 
-/// Run a fold1 over a stream of values in parallel
+/// Run a fold over a stream of values in parallel
 pub async fn run_fold_par_stream<O, I, F>(
     fold: &F,
     j: usize,
@@ -194,21 +193,7 @@ where
     )
 }
 
-// /// Run a fold over a stream of values in parallel
-// pub async fn run_fold_par_stream<O, I, F>(
-//     fold: &'static F,
-//     xs: impl Stream<Item = I> + par_stream::ParStreamExt,
-// ) -> O
-// where
-//     F: Fold<A = I, B = O> + FoldPar + Sync,
-//     F::M: Send,
-//     I: Send + 'static,
-// {
-//     run_fold1_par_stream(fold, xs)
-//         .await
-//         .unwrap_or(fold.output(fold.empty()))
-// }
-
+/// Run a fold over a parallel iterator of values
 pub fn run_fold_par_iter<I, O, F>(iter: impl IndexedParallelIterator<Item = I>, fold: &F) -> O
 where
     F: FoldPar + Fold<A = I, B = O> + Sync,
