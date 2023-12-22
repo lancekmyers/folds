@@ -1,13 +1,10 @@
-use folds::{
-    self,
-    fold::{Fold, Fold1, FoldPar},
-};
+use arrow::array::Array;
+use folds::fold::Fold1 as _;
+use folds::{self, fold::run_fold_par_stream, stats::SampleN};
 use parquet::arrow::async_reader;
 use parquet::arrow::ProjectionMask;
 
-use futures::{StreamExt, TryStreamExt};
-
-use rayon::{iter::ParallelIterator, slice::ParallelSlice};
+use futures::StreamExt;
 
 #[tokio::main]
 async fn main() {
@@ -18,8 +15,6 @@ async fn main() {
     let threads: usize = args.next().map(|str| str.parse().unwrap()).unwrap_or(4);
     let batch_size: usize = args.next().map(|str| str.parse().unwrap()).unwrap_or(1024);
 
-    let chunk_size: usize = args.next().map(|str| str.parse().unwrap()).unwrap_or(1024);
-
     let builder = async_reader::ParquetRecordBatchStreamBuilder::new(file)
         .await
         .unwrap()
@@ -28,36 +23,26 @@ async fn main() {
     let file_metadata = builder.metadata().file_metadata();
     let mask = ProjectionMask::roots(file_metadata.schema_descr(), [3]);
 
-    let stream = builder.with_projection(mask).build().unwrap();
+    let stream = builder
+        .with_projection(mask)
+        .build()
+        .unwrap()
+        .filter_map(|batch| async move {
+            let binding = batch.ok()?;
+            let prim_arr = binding
+                .column(0)
+                .as_any()
+                .downcast_ref::<arrow::array::Float64Array>()?;
+            Some(Vec::from(&prim_arr.values()[..]))
+        });
 
-    let fld = folds::stats::CM4::CM4;
+    let fld = folds::stats::CM4::CM4
+        .par(SampleN::<20, f64>::SAMPLE)
+        .batched();
 
     println!("Starting iteration");
 
-    let intermediate = stream
-        .filter_map(|x| async { x.ok() })
-        .map(|batch| {
-            tokio::spawn(async move {
-                let col = batch
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<arrow::array::Float64Array>()
-                    .unwrap();
-                let mut acc = fld.empty();
-                fld.step_chunk(col.values(), &mut acc);
-                acc
-            })
-        })
-        .buffered(threads)
-        .fold(fld.empty(), |mut m1, m2| async move {
-            if let Ok(m2) = m2 {
-                fld.merge(&mut m1, m2);
-            }
-            m1
-        })
-        .await;
+    let ans = run_fold_par_stream(&fld, threads, stream);
 
-    let ans = fld.output(intermediate);
-
-    println!("Summary for passenger_count: {:?}", ans);
+    println!("Summary for passenger_count: {:?}", ans.await);
 }
