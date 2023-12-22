@@ -8,8 +8,6 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
 use futures::{self, Stream, StreamExt};
 
-use par_stream::prelude::*;
-
 /// Trait representing that something can be seen as a "fold1", i.e.
 /// a fold that will always be given at least one input.
 pub trait Fold1 {
@@ -168,7 +166,7 @@ pub async fn run_fold_stream<O, I>(fold: &impl Fold<A = I, B = O>, xs: impl Stre
 pub async fn run_fold_par_stream<O, I, F>(
     fold: &F,
     j: usize,
-    xs: impl ParStreamExt<Item = I>,
+    xs: impl StreamExt<Item = I>,
 ) -> Option<O>
 where
     F: Fold<A = I, B = O> + FoldPar + Send + Sync + Clone + 'static,
