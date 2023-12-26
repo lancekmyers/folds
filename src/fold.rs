@@ -589,6 +589,7 @@ impl<A: Clone, F: FoldPar<A = A> + Fold> FoldPar for Batched<F> {
 }
 
 /// Perform a fold in parallel with itself over a wide stream
+#[derive(Copy, Clone)]
 pub struct Many<F: Fold1> {
     inner: F,
     n: usize,
@@ -622,5 +623,13 @@ impl<F: Fold> Fold for Many<F> {
             accs.push(self.inner.empty());
         }
         accs
+    }
+}
+
+impl<F: FoldPar> FoldPar for Many<F> {
+    fn merge(&self, m1: &mut Self::M, m2: Self::M) {
+        for (m1, m2) in m1.into_iter().zip(m2.into_iter()) {
+            self.inner.merge(m1, m2)
+        }
     }
 }
