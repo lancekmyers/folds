@@ -120,6 +120,14 @@ pub trait Fold1 {
     {
         Batched { inner: self }
     }
+
+    /// Paralellizes a fold with itself over a wide stream
+    fn many(self, n: usize) -> Many<Self>
+    where
+        Self: Sized,
+    {
+        Many { inner: self, n: n }
+    }
 }
 
 pub trait Fold: Fold1 {
@@ -575,5 +583,42 @@ impl<A: Clone, F: Fold<A = A>> Fold for Batched<F> {
 impl<A: Clone, F: FoldPar<A = A> + Fold> FoldPar for Batched<F> {
     fn merge(&self, m1: &mut Self::M, m2: Self::M) {
         self.inner.merge(m1, m2)
+    }
+}
+
+/// Perform a fold in parallel with itself over a wide stream
+pub struct Many<F: Fold1> {
+    inner: F,
+    n: usize,
+}
+impl<F: Fold1> Fold1 for Many<F> {
+    type A = Vec<F::A>;
+
+    type B = Vec<F::B>;
+
+    type M = Vec<F::M>;
+
+    fn init(&self, x: Self::A) -> Self::M {
+        x.into_iter().map(|x| self.inner.init(x)).collect()
+    }
+
+    fn step(&self, x: Self::A, acc: &mut Self::M) {
+        for (mut a, x) in acc.into_iter().zip(x.into_iter()) {
+            self.inner.step(x, &mut a)
+        }
+    }
+
+    fn output(&self, acc: Self::M) -> Self::B {
+        acc.into_iter().map(|a| self.inner.output(a)).collect()
+    }
+}
+
+impl<F: Fold> Fold for Many<F> {
+    fn empty(&self) -> Self::M {
+        let mut accs = Vec::with_capacity(self.n);
+        for _ in 0..self.n {
+            accs.push(self.inner.empty());
+        }
+        accs
     }
 }
