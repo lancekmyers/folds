@@ -113,6 +113,8 @@ pub trait Fold1 {
         }
     }
 
+    /// Batched version of a fold, ie the input type is now
+    /// chunks of data. This can be useful for vectorization
     fn batched(self) -> Batched<Self>
     where
         Self: Sized,
