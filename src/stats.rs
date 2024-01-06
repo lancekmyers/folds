@@ -88,27 +88,27 @@ impl FoldPar for CM4<f64> {
     // todo: remove divisions by using delta / nAB
     //   probably will not mattter and might make it harder to read
     fn merge(&self, acc1: &mut Self::M, acc2: Self::M) {
-        let nA = acc1.n as f64;
-        let nB = acc2.n as f64;
-        let nAB = nA + nB;
+        let n_a = acc1.n as f64;
+        let n_b = acc2.n as f64;
+        let n_ab = n_a + n_b;
         let delta = acc2.m - acc1.m;
         acc1.n += acc2.n;
-        acc1.m += delta * nB / nAB;
+        acc1.m += delta * n_b / n_ab;
 
-        let m2A = acc1.m2;
-        let m2B = acc2.m2;
-        acc1.m2 += acc2.m2 + delta * delta * nA * nB / nAB;
+        let m2_a = acc1.m2;
+        let m2_b = acc2.m2;
+        acc1.m2 += acc2.m2 + delta * delta * n_a * n_b / n_ab;
 
         acc1.m3 += acc2.m3
-            + delta.powi(3) * nA * nB * nAB.powi(-2) * (nA - nB)
-            + 3.0 * delta * (nA * m2B - nB * m2A) / nAB;
+            + delta.powi(3) * n_a * n_b * n_ab.powi(-2) * (n_a - n_b)
+            + 3.0 * delta * (n_a * m2_b - n_b * m2_a) / n_ab;
 
-        let m3A = acc1.m3;
-        let m3B = acc2.m3;
+        let m3_a = acc1.m3;
+        let m3_b = acc2.m3;
         acc1.m4 += acc2.m4
-            + delta.powi(4) * nA * nB * (nA * nA - nA * nB + nB * nB) * nAB.powi(-3)
-            + 6.0 * delta * delta * (nA * nA * m2B + nB * nB * m2A) * nAB.powi(-2)
-            + 4.0 * delta * (nA * m3B - nB * m3A) / nAB;
+            + delta.powi(4) * n_a * n_b * (n_a * n_a - n_a * n_b + n_b * n_b) * n_ab.powi(-3)
+            + 6.0 * delta * delta * (n_a * n_a * m2_b + n_b * n_b * m2_a) * n_ab.powi(-2)
+            + 4.0 * delta * (n_a * m3_b - n_b * m3_a) / n_ab;
     }
 }
 

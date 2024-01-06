@@ -128,7 +128,7 @@ pub trait Fold1 {
     where
         Self: Sized,
     {
-        Many { inner: self, n: n }
+        Many { inner: self, n }
     }
 }
 
@@ -606,8 +606,8 @@ impl<F: Fold1> Fold1 for Many<F> {
     }
 
     fn step(&self, x: Self::A, acc: &mut Self::M) {
-        for (mut a, x) in acc.into_iter().zip(x.into_iter()) {
-            self.inner.step(x, &mut a)
+        for (a, x) in acc.iter_mut().zip(x.into_iter()) {
+            self.inner.step(x, a)
         }
     }
 
@@ -628,7 +628,7 @@ impl<F: Fold> Fold for Many<F> {
 
 impl<F: FoldPar> FoldPar for Many<F> {
     fn merge(&self, m1: &mut Self::M, m2: Self::M) {
-        for (m1, m2) in m1.into_iter().zip(m2.into_iter()) {
+        for (m1, m2) in m1.iter_mut().zip(m2.into_iter()) {
             self.inner.merge(m1, m2)
         }
     }
