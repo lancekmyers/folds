@@ -2,7 +2,7 @@
 
 This is meant to be a first class rust folds library like the classic 
 Haskell library
-(foldl)[https://hackage.haskell.org/package/foldl].
+[foldl](https://hackage.haskell.org/package/foldl).
 
 This allows the user to build up a fold from smaller pieces. 
 For example, you could combine the `sum` fold and the `count` fold
